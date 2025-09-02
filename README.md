@@ -101,13 +101,13 @@ Asegúrate de tener instalado lo siguiente:
 
 ## ▶️ Ejecutando la Aplicación
 
-### Modo de desarrollo (con recarga automática):
+### Modo de desarrollo (con recarga automática)
 
 ```bash
 npm run dev
 ```
 
-### Modo de producción:
+### Modo de producción
 
 1. Primero, construye el proyecto (transpilar de TypeScript a JavaScript):
 
@@ -125,14 +125,19 @@ npm run dev
 
 ### Crear Usuario Administrador
 
-El proyecto incluye un script para crear un usuario administrador inicial en la base de datos. Esto es útil para la
-configuración inicial del sistema.
+El proyecto incluye un script independiente (create-admin.ts) para crear un usuario administrador inicial en la base de datos. Esto es especialmente útil para la configuración inicial del sistema, ya que permite registrar al primer administrador sin necesidad de una API pública.
 
-Para ejecutarlo, asegúrate de que tu base de datos MongoDB esté corriendo y que la `MONGO_URI` en tu archivo `.env` sea
+### ¿Cómo funciona?
+
+El script se conecta a la base de datos MongoDB utilizando la MONGO_URI de tu archivo .env, verifica si ya existe un administrador con el correo o nombre de usuario especificados y, si no existe, crea uno nuevo con los datos definidos en el propio script, hasheando la contraseña antes de guardarla.
+
+### Para ejecutarlo
+
+Asegúrate de que tu base de datos MongoDB esté corriendo y que la `MONGO_URI` en tu archivo `.env` sea
 correcta. Luego, ejecuta:
 
 ```bash
-npx ts-node create-admin.ts
+npx ts-node src/create-admin.ts
 ```
 
 ## 📋 API Endpoints
