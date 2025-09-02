@@ -5,9 +5,9 @@
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc",
-    "start": "npm run seed && node dist/server.js",
+    "start": "node dist/server.js",
+    "start:prod": "node dist/create-admin.js && npm start",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-    "seed": "ts-node dist/create-admin.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
