@@ -70,6 +70,17 @@ async function createAdmin(): Promise<void> {
     await mongoose.connect(MONGO_URI);
     console.log("Conectado a la base de datos MongoDB.");
 
+    const existingAdmin = await User.findOne({
+      $or: [{ email }, { username }],
+    });
+
+    if (existingAdmin) {
+      console.log(
+        `\nEl usuario administrador con el correo electrónico '${email}' o el nombre de usuario '${username}' ya existe.`
+      );
+      return;
+    }
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
     console.log("Contraseña hasheada exitosamente.");
@@ -87,17 +98,7 @@ async function createAdmin(): Promise<void> {
     await adminUser.save();
     console.log(`\n¡Usuario administrador '${username}' creado exitosamente!`);
   } catch (error: any) {
-    if (error.code === 11000) {
-      // Este error ocurre cuando hay una violación de la clave única (email o username)
-      console.error(
-        `\nError: El correo electrónico '${email}' o el nombre de usuario '${username}' ya existen en la base de datos.`
-      );
-    } else {
-      console.error(
-        "\nError al crear el usuario administrador:",
-        error.message
-      );
-    }
+    console.error("\nError al crear el usuario administrador:", error.message);
   } finally {
     await mongoose.disconnect();
     console.log("Desconectado de la base de datos.");
