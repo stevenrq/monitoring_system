@@ -42,6 +42,7 @@ monitoring_system/
 │   ├── models/               # Esquemas de la base de datos (Mongoose)
 │   ├── routes/               # Definición de las rutas de la API
 │   └── services/             # Lógica de negocio y comunicación con la base de datos
+│   └── create-admin.ts       # Script para crear un usuario administrador
 ├── .env                      # Variables de entorno (no versionado)
 ├── .gitignore                # Archivos y carpetas ignorados por Git
 ├── create-admin.ts           # Script para crear un usuario administrador
