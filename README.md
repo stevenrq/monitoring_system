@@ -50,6 +50,12 @@ monitoring_system/
 └── tsconfig.json             # Configuración del compilador de TypeScript
 ```
 
+## 📑 Documentación con DeepWiki
+
+Para más información sobre el proyecto, puedes preguntarle a DeepWiki:
+
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/stevenrq/monitoring_system)
+
 ## 🚀 Empezando
 
 Sigue estas instrucciones para tener una copia del proyecto corriendo en tu máquina local para desarrollo y pruebas.
