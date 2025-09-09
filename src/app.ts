@@ -9,11 +9,9 @@ connectDB();
 
 const app = express();
 
-// ADVERTENCIA: Configuración de CORS insegura. Esto es solo para fines de desarrollo/pruebas.
-// Para producción, se debe restringir los orígenes a una lista blanca (whitelist) específica.
 const corsOptions: CorsOptions = {
-  origin: true,
-  credentials: true,
+  origin: true, // Permite todas las solicitudes desde cualquier origen
+  credentials: true, // Habilita el envío de cookies y encabezados de autorización
 };
 
 app.use(cors(corsOptions));
