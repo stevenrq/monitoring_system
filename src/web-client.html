@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dashboard de Monitoreo en Tiempo Real</title>
+    <!-- Bootstrap CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <!-- Bootstrap Icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+    />
+    <style>
+      body {
+        background-color: #f8f9fa;
+      }
+      #logs {
+        border: 1px solid #dee2e6;
+        background-color: #fff;
+        padding: 1rem;
+        height: 150px;
+        overflow-y: scroll;
+        font-family: monospace;
+        font-size: 0.9rem;
+      }
+      .card-header,
+      .card-title {
+        color: #0d6efd;
+      }
+      .badge {
+        transition: background-color 0.3s ease-in-out;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container mt-4">
+      <header class="text-center mb-4">
+        <h1 class="display-5">Dashboard de Monitoreo</h1>
+        <p class="lead">
+          Suscríbete a dispositivos para ver sus datos de sensores en vivo.
+        </p>
+      </header>
+
+      <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Suscripción a Dispositivos</h5>
+          <div class="input-group">
+            <input
+              type="text"
+              id="deviceIdInput"
+              class="form-control"
+              placeholder="Ej: ESP32_1 o ESP32_2"
+              value="ESP32_1"
+            />
+            <button id="subscribeBtn" class="btn btn-primary">
+              <i class="bi bi-plus-circle"></i> Suscribirse
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="devices-container">
+        <!-- Las tarjetas de los dispositivos se insertarán aquí -->
+      </div>
+
+      <div class="mt-4">
+        <h5>Log de Conexión:</h5>
+        <div id="logs"></div>
+      </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.js"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+
+    <script>
+      const logs = document.getElementById("logs");
+      const deviceIdInput = document.getElementById("deviceIdInput");
+      const subscribeBtn = document.getElementById("subscribeBtn");
+      const devicesContainer = document.getElementById("devices-container");
+
+      const subscribedDevices = new Set();
+
+      const socket = io("http://localhost:3000/web-clients");
+
+      socket.on("connect", () => {
+        logMessage("Conectado al servidor de WebSockets.");
+      });
+
+      socket.on("disconnect", (reason) => {
+        logMessage(`Desconectado del servidor: ${reason}.`);
+      });
+
+      socket.on("newSensorData", (data) => {
+        const { deviceId, sensorType, value, unit } = data;
+
+        if (!subscribedDevices.has(deviceId)) {
+          return;
+        }
+
+        const sensorList = document.getElementById(`sensors-list-${deviceId}`);
+        if (!sensorList) return;
+
+        let sensorItem = document.getElementById(
+          `sensor-${deviceId}-${sensorType}`,
+        );
+
+        if (!sensorItem) {
+          sensorItem = document.createElement("li");
+          sensorItem.className =
+            "list-group-item d-flex justify-content-between align-items-center";
+          sensorItem.id = `sensor-${deviceId}-${sensorType}`;
+
+          const icon = getSensorIcon(sensorType);
+          const sensorName = getSensorName(sensorType);
+
+          sensorItem.innerHTML = `
+            <span>
+                ${icon}
+                <strong class="ms-2">${sensorName}:</strong>
+            </span>
+            <span class="badge bg-primary rounded-pill fs-6" id="value-${deviceId}-${sensorType}">
+                ${value.toFixed(2)} ${unit}
+            </span>
+          `;
+          sensorList.appendChild(sensorItem);
+        } else {
+          const valueBadge = document.getElementById(
+            `value-${deviceId}-${sensorType}`,
+          );
+          if (valueBadge) {
+            valueBadge.textContent = `${value.toFixed(2)} ${unit}`;
+
+            valueBadge.classList.remove("bg-primary", "bg-success");
+            valueBadge.classList.add("bg-success");
+            setTimeout(() => {
+              valueBadge.classList.remove("bg-success");
+              valueBadge.classList.add("bg-primary");
+            }, 500);
+          }
+        }
+      });
+
+      subscribeBtn.addEventListener("click", () => {
+        const deviceId = deviceIdInput.value.trim();
+        if (!deviceId) {
+          alert("Por favor, introduce un ID de dispositivo.");
+          return;
+        }
+
+        if (deviceId !== "ESP32_1" && deviceId !== "ESP32_2") {
+          console.log(deviceId);
+          alert("Solo se permite ESP32_1 o ESP32_2");
+          return;
+        }
+
+        if (subscribedDevices.has(deviceId)) {
+          logMessage(`Ya estás suscrito a ${deviceId}.`);
+          const existingCard = document.getElementById(`device-${deviceId}`);
+          if (existingCard) {
+            existingCard.classList.add("border-warning", "border-2");
+            setTimeout(
+              () => existingCard.classList.remove("border-warning", "border-2"),
+              1000,
+            );
+          }
+          return;
+        }
+
+        socket.emit("subscribeToDevice", deviceId);
+        logMessage(`Suscrito a los datos de: ${deviceId}`);
+        createDeviceCard(deviceId);
+        subscribedDevices.add(deviceId);
+        deviceIdInput.value = "";
+        deviceIdInput.focus();
+      });
+
+      deviceIdInput.addEventListener("keyup", function (event) {
+        if (event.key === "Enter") {
+          subscribeBtn.click();
+        }
+      });
+
+      function createDeviceCard(deviceId) {
+        if (document.getElementById(`device-${deviceId}`)) return;
+
+        const card = document.createElement("div");
+        card.className = "card mb-3 shadow-sm";
+        card.id = `device-${deviceId}`;
+
+        card.innerHTML = `
+          <div class="card-header d-flex justify-content-between align-items-center">
+              <span>Dispositivo: <strong>${deviceId}</strong></span>
+              <button class="btn btn-sm btn-outline-danger" onclick="unsubscribe('${deviceId}')">
+                  <i class="bi bi-x-circle"></i> Dejar de seguir
+              </button>
+          </div>
+          <div class="card-body">
+              <h5 class="card-title">Lecturas de Sensores</h5>
+              <ul class="list-group list-group-flush" id="sensors-list-${deviceId}">
+              </ul>
+          </div>
+        `;
+        devicesContainer.appendChild(card);
+      }
+
+      function unsubscribe(deviceId) {
+        if (!subscribedDevices.has(deviceId)) return;
+
+        socket.emit("unsubscribeFromDevice", deviceId);
+        logMessage(`Desuscrito de los datos de: ${deviceId}`);
+
+        const card = document.getElementById(`device-${deviceId}`);
+        if (card) {
+          card.remove();
+        }
+
+        subscribedDevices.delete(deviceId);
+      }
+
+      function getSensorName(sensorType) {
+        const names = {
+          temperature: "Temperatura",
+          humidity: "Humedad",
+          air_quality: "Calidad del Aire",
+          hydrological_flow: "Caudal Hidrológico",
+        };
+        return (
+          names[sensorType] ||
+          sensorType.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())
+        );
+      }
+
+      function getSensorIcon(sensorType) {
+        const icons = {
+          temperature: '<i class="bi bi-thermometer-half text-danger"></i>',
+          humidity: '<i class="bi bi-droplet-half text-info"></i>',
+          air_quality: '<i class="bi bi-wind text-secondary"></i>',
+          hydrological_flow: '<i class="bi bi-water text-primary"></i>',
+        };
+        return icons[sensorType] || '<i class="bi bi-cpu text-muted"></i>';
+      }
+
+      function logMessage(message) {
+        const p = document.createElement("p");
+        p.className = "mb-1";
+        p.innerHTML = `<code>[${new Date().toLocaleTimeString()}]</code> ${message}`;
+        logs.appendChild(p);
+        logs.scrollTop = logs.scrollHeight;
+      }
+    </script>
+  </body>
+</html>
