@@ -1,31 +1,9 @@
-import { Schema, model, Document, Model } from "mongoose";
+import { Schema, model } from "mongoose";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
+import { IUser, IUserModel } from "../interfaces/user.interface";
 
-export interface IUser extends Document {
-  name?: string;
-  lastName?: string;
-  phone?: number;
-  email?: string;
-  username?: string;
-  password?: string;
-
-  /**
-   * Rol del usuario (user o admin)
-   */
-  role?: "user" | "admin";
-
-  /**
-   * Compara la contraseña proporcionada con la contraseña almacenada
-   * @param candidatePassword  La contraseña proporcionada por el usuario
-   * @returns  Verdadero si las contraseñas coinciden, falso en caso contrario
-   */
-  comparePassword(candidatePassword: string): Promise<boolean>;
-  refreshToken?: string;
-}
-
-export interface IUserModel extends Model<IUser> {}
-
-const UserSchema = new Schema<IUser, IUserModel>(
+export const UserSchema = new Schema<IUser, IUserModel>(
   {
     name: { type: String, required: [true, "El nombre es obligatorio"] },
     lastName: { type: String, required: [true, "El apellido es obligatorio"] },
@@ -68,6 +46,8 @@ const UserSchema = new Schema<IUser, IUserModel>(
       default: "user",
     },
     refreshToken: { type: String, select: false },
+    passwordResetToken: String,
+    passwordResetExpires: Date,
   },
   { timestamps: true },
 );
@@ -90,7 +70,22 @@ UserSchema.pre<IUser>("save", async function (next) {
 UserSchema.methods.comparePassword = async function (
   candidatePassword: string,
 ): Promise<boolean> {
+  if (!this.password) return false;
   return await bcrypt.compare(candidatePassword, this.password);
+};
+
+UserSchema.methods.createPasswordResetToken = function (): string {
+  const resetToken = crypto.randomBytes(32).toString("hex");
+
+  this.passwordResetToken = crypto
+    .createHash("sha256")
+    .update(resetToken)
+    .digest("hex");
+
+  // El token expira en 10 minutos
+  this.passwordResetExpires = new Date(Date.now() + 10 * 60 * 1000);
+
+  return resetToken;
 };
 
 const User = model<IUser, IUserModel>("User", UserSchema);

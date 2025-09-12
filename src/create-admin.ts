@@ -3,60 +3,26 @@
  * El uso de este script es solo para fines de desarrollo y pruebas.
  */
 import dotenv from "dotenv";
-import mongoose, { Schema, Document } from "mongoose";
+import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
+import { IAdminData } from "./interfaces/user.interface";
+import User from "./models/user.model";
 
 dotenv.config();
 
-interface IUser extends Document {
-  name?: string;
-  lastName?: string;
-  phone?: number;
-  email?: string;
-  username?: string;
-  password?: string;
-  role?: "user" | "admin";
-}
-
-const userSchema: Schema = new Schema<IUser>(
-  {
-    name: { type: String, required: true },
-    lastName: { type: String, required: true },
-    phone: {
-      type: Number,
-      required: [true, "El teléfono es obligatorio"],
-      unique: true,
-      validate: {
-        validator: (phone: number) => {
-          return /^\d{10}$/.test(phone.toString());
-        },
-        message: "El teléfono debe tener 10 dígitos",
-      },
-    },
-    email: { type: String, required: true, unique: true },
-    username: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    role: { type: String, enum: ["user", "admin"], default: "user" },
-  },
-  { timestamps: true }
-);
-
-const User =
-  (mongoose.models.User as mongoose.Model<IUser>) ||
-  mongoose.model<IUser>("User", userSchema);
-
 async function createAdmin(): Promise<void> {
   // NOTA: Se debe asegurar que las propiedades coincidan con el esquema definido en src/models/user.model.ts
-  const adminData = {
+  const adminData: IAdminData = {
     name: "Steven",
     lastName: "Ricardo Quiñones",
     phone: 3207108160,
     email: "stevenrq8@gmail.com",
     username: "stevenrq8",
     password: "stevenrq8",
+    role: "admin",
   };
 
-  const { name, lastName, phone, email, username, password } = adminData;
+  const { name, lastName, phone, email, username, password, role } = adminData;
 
   console.log(`Intentando crear al administrador: '${username}'...`);
 
@@ -76,13 +42,13 @@ async function createAdmin(): Promise<void> {
 
     if (existingAdmin) {
       console.log(
-        `\nEl usuario administrador con el correo electrónico '${email}' o el nombre de usuario '${username}' ya existe.`
+        `\nEl usuario administrador con el correo electrónico '${email}' o el nombre de usuario '${username}' ya existe.`,
       );
       return;
     }
 
     const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    const hashedPassword = await bcrypt.hash(password ?? "", salt);
     console.log("Contraseña hasheada exitosamente.");
 
     const adminUser = new User({
@@ -92,7 +58,7 @@ async function createAdmin(): Promise<void> {
       email,
       username,
       password: hashedPassword,
-      role: "admin",
+      role: role,
     });
 
     await adminUser.save();

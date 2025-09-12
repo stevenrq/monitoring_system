@@ -1,7 +1,10 @@
 import { Request } from "express";
 import jwt from "jsonwebtoken";
-import User, { IUser } from "../models/user.model";
+import { IUser } from "../interfaces/user.interface";
+import User from "../models/user.model";
 import { StringValue } from "ms";
+import { sendEmail } from "./email.service";
+import crypto from "crypto";
 
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET!;
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET!;
@@ -111,4 +114,54 @@ export const refreshToken = async (
     console.error("Error al refrescar el token:", error);
     throw new Error("Refresh token inválido o expirado");
   }
+};
+
+export const forgotPassword = async (email: string): Promise<void> => {
+  const user = await User.findOne({ email });
+  if (!user) {
+    // Para no revelar si un usuario existe o no, no lanzamos un error aquí.
+    // La función simplemente retornará y el controlador enviará una respuesta genérica.
+    console.log(`Intento de recuperación para email no registrado: ${email}`);
+    return;
+  }
+
+  const resetToken = user.createPasswordResetToken();
+  await user.save({ validateBeforeSave: false });
+
+  // TODO: Idealmente, la URL del frontend debería venir de una variable de entorno
+  const resetURL = `http://localhost:3000/reset-password/${resetToken}`; // O la URL de tu frontend
+
+  const message = `
+    <h1>Has solicitado un restablecimiento de contraseña</h1>
+    <p>Haz clic en el siguiente enlace para restablecer tu contraseña. El enlace es válido por 10 minutos:</p>
+    <a href="${resetURL}" target="_blank">Restablecer Contraseña</a>
+    <p>Si no solicitaste este cambio, por favor ignora este correo.</p>
+  `;
+
+  await sendEmail({
+    to: user.email!,
+    subject: "Restablecimiento de Contraseña - Sistema de Monitoreo",
+    html: message,
+  });
+};
+
+export const resetPassword = async (
+  token: string,
+  newPassword: string,
+): Promise<void> => {
+  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+  const user = await User.findOne({
+    passwordResetToken: hashedToken,
+    passwordResetExpires: { $gt: new Date() },
+  });
+
+  if (!user) {
+    throw new Error("El token es inválido o ha expirado.");
+  }
+
+  user.password = newPassword;
+  user.passwordResetToken = undefined;
+  user.passwordResetExpires = undefined;
+  await user.save();
 };

@@ -52,3 +52,40 @@ export const handleRefreshToken = async (req: Request, res: Response) => {
     }
   }
 };
+
+export const handleForgotPassword = async (req: Request, res: Response) => {
+  try {
+    await authService.forgotPassword(req.body.email);
+    res.status(200).json({
+      message:
+        "Si existe una cuenta con ese correo, se ha enviado un enlace para restablecer la contraseña.",
+    });
+  } catch (error) {
+    // El error solo se capturará si falla el envío del correo, no si el usuario no existe.
+    if (error instanceof Error) {
+      res.status(500).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: "Error desconocido" });
+    }
+  }
+};
+
+export const handleResetPassword = async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({ error: "La nueva contraseña es requerida." });
+    }
+
+    await authService.resetPassword(token, password);
+    res.status(200).json({ message: "Contraseña restablecida exitosamente." });
+  } catch (error) {
+    if (error instanceof Error) {
+      res.status(400).json({ error: error.message });
+    } else {
+      res.status(400).json({ error: "Error desconocido" });
+    }
+  }
+};
