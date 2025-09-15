@@ -12,16 +12,17 @@ const ACCESS_TOKEN_EXPIRES_IN = (process.env.ACCESS_TOKEN_EXPIRES_IN ||
   "15m") as StringValue;
 const REFRESH_TOKEN_EXPIRES_IN = (process.env.REFRESH_TOKEN_EXPIRES_IN ||
   "30d") as StringValue;
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
 
 if (!ACCESS_TOKEN_SECRET || !REFRESH_TOKEN_SECRET) {
   console.error(
-    "Error fatal: Las variables de entorno para los tokens JWT no están definidas.",
+    "Error fatal: Las variables de entorno para los tokens JWT no están definidas."
   );
   process.exit(1);
 }
 
 const generateTokens = async (
-  user: IUser,
+  user: IUser
 ): Promise<{ accessToken: string; refreshToken: string }> => {
   const payload = {
     userId: user._id,
@@ -72,7 +73,7 @@ export const createAdmin = async (req: Request): Promise<IUser> => {
 };
 
 export const login = async (
-  req: Request,
+  req: Request
 ): Promise<{ accessToken: string; refreshToken: string }> => {
   const { username, password } = req.body;
 
@@ -96,7 +97,7 @@ export const login = async (
 };
 
 export const refreshToken = async (
-  oldRefreshToken: string,
+  oldRefreshToken: string
 ): Promise<{ accessToken: string; refreshToken: string }> => {
   try {
     const decoded = jwt.verify(oldRefreshToken, REFRESH_TOKEN_SECRET) as {
@@ -128,8 +129,7 @@ export const forgotPassword = async (email: string): Promise<void> => {
   const resetToken = user.createPasswordResetToken();
   await user.save({ validateBeforeSave: false });
 
-  // TODO: Idealmente, la URL del frontend debería venir de una variable de entorno
-  const resetURL = `http://localhost:3000/reset-password/${resetToken}`; // O la URL de tu frontend
+  const resetURL = `${FRONTEND_URL}/reset-password/${resetToken}`;
 
   const message = `
     <h1>Has solicitado un restablecimiento de contraseña</h1>
@@ -147,7 +147,7 @@ export const forgotPassword = async (email: string): Promise<void> => {
 
 export const resetPassword = async (
   token: string,
-  newPassword: string,
+  newPassword: string
 ): Promise<void> => {
   const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
 
