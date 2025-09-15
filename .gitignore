@@ -50,3 +50,4 @@ mongod.log
 
 coverage/
 .nyc_output/
+env_vars/

@@ -1,4 +1,5 @@
-import User, { IUser } from "../models/user.model";
+import User from "../models/user.model";
+import { IUser } from "../interfaces/user.interface";
 
 export const createUser = async (userData: Partial<IUser>): Promise<IUser> => {
   const newUser = new User(userData);
