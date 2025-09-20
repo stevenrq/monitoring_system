@@ -92,6 +92,46 @@
 
       const socket = io("http://localhost:3000/web-clients");
 
+      document.addEventListener("DOMContentLoaded", () => {
+        if ("Notification" in window && Notification.permission !== "granted") {
+          Notification.requestPermission();
+        }
+      });
+
+      function showNotification(title, body) {
+        if (!("Notification" in window)) {
+          alert("Este navegador no soporta notificaciones de escritorio.");
+          return;
+        }
+
+        if (Notification.permission === "granted") {
+          new Notification(title, { body });
+        } else if (Notification.permission !== "denied") {
+          Notification.requestPermission().then((permission) => {
+            if (permission === "granted") {
+              new Notification(title, { body });
+            }
+          });
+        }
+      }
+
+      // Escuchar el nuevo evento de alerta del servidor
+      socket.on("sensorAlert", (alert) => {
+        const { deviceId, message } = alert;
+        logMessage(`<strong>ALERTA RECIBIDA:</strong> ${message}`);
+        showNotification(`Alerta del Dispositivo ${deviceId}`, message);
+
+        // Opcional: Resaltar la tarjeta del dispositivo que generó la alerta
+        const alertCard = document.getElementById(`device-${deviceId}`);
+        if (alertCard) {
+          alertCard.classList.add("border-danger", "border-3");
+          setTimeout(
+            () => alertCard.classList.remove("border-danger", "border-3"),
+            5000,
+          );
+        }
+      });
+
       socket.on("connect", () => {
         logMessage("Conectado al servidor de WebSockets.");
       });

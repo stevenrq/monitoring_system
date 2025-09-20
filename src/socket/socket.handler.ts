@@ -1,6 +1,7 @@
 import { Server, Socket } from "socket.io";
 import SensorData from "../models/sensor-data.model";
 import { SensorPayload } from "../interfaces/sensor-payload";
+import { checkSensorDataForAlerts } from "../services/notification.service";
 
 /**
  * Inicializa los manejadores de eventos de Socket.IO para diferentes namespaces.
@@ -10,6 +11,7 @@ import { SensorPayload } from "../interfaces/sensor-payload";
  */
 const initializeSocket = (io: Server) => {
   const devicesNamespace = io.of("/devices");
+  const webClientsNamespace = io.of("/web-clients");
 
   devicesNamespace.on("connection", (socket: Socket) => {
     console.log(`Un dispositivo se ha conectado: ${socket.id}`);
@@ -48,6 +50,8 @@ const initializeSocket = (io: Server) => {
           io.of("/web-clients")
             .to(sensorData.deviceId)
             .emit("newSensorData", sensorData);
+
+          checkSensorDataForAlerts(io, sensorData);
         }
       } catch (error) {
         console.error("Error al procesar los datos del sensor:", error);
@@ -59,8 +63,6 @@ const initializeSocket = (io: Server) => {
       console.log(`Un dispositivo se ha desconectado: ${socket.id}`);
     });
   });
-
-  const webClientsNamespace = io.of("/web-clients");
 
   webClientsNamespace.on("connection", (socket: Socket) => {
     console.log(`Un cliente web se ha conectado: ${socket.id}`);
