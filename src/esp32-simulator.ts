@@ -2,7 +2,7 @@ import { io, Socket } from "socket.io-client";
 import { SensorPayload } from "./interfaces/sensor-payload";
 
 const SERVER_URL = "http://localhost:3000/devices";
-const SIMULATION_INTERVAL_MS = 5000;
+const SIMULATION_INTERVAL_MS = 1000;
 
 // Configuración para cada dispositivo simulado
 const deviceConfig = {
