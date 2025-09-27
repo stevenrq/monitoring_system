@@ -90,7 +90,9 @@
 
       const subscribedDevices = new Set();
 
-      const socket = io(`${process.env.BACKEND_URL}/web-clients`);
+      const socket = io(
+        "https://monitoring-system-opbd.onrender.com/web-clients",
+      );
 
       document.addEventListener("DOMContentLoaded", () => {
         if ("Notification" in window && Notification.permission !== "granted") {
