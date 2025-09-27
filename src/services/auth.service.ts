@@ -158,7 +158,9 @@ export const forgotPassword = async (email: string): Promise<void> => {
 
   await sendEmail({
     to: user.email!,
+    from: process.env.EMAIL_USER!,
     subject: "Nueva contraseña temporal - Sistema de Monitoreo Ambiental",
+    text: `Se ha generado una contraseña temporal para tu cuenta: ${temporaryPassword}. Por favor, inicia sesión y cámbiala.`,
     html: message,
   });
 };

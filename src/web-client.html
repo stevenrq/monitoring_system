@@ -90,7 +90,7 @@
 
       const subscribedDevices = new Set();
 
-      const socket = io("http://localhost:3000/web-clients");
+      const socket = io(`${process.env.BACKEND_URL}/web-clients`);
 
       document.addEventListener("DOMContentLoaded", () => {
         if ("Notification" in window && Notification.permission !== "granted") {

@@ -58,8 +58,7 @@ export const handleForgotPassword = async (req: Request, res: Response) => {
   try {
     await authService.forgotPassword(req.body.email);
     res.status(200).json({
-      message:
-        "Si existe una cuenta con ese correo, se ha enviado un enlace para restablecer la contraseña.",
+      message: "Se ha enviado un correo con la nueva contraseña.",
     });
   } catch (error) {
     // El error solo se capturará si falla el envío del correo, no si el usuario no existe.
