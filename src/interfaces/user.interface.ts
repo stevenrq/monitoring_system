@@ -13,8 +13,6 @@ export interface IUser extends Document {
   password?: string;
   role?: "user" | "admin";
   refreshToken?: string;
-  passwordResetToken?: string;
-  passwordResetExpires?: Date;
 
   /**
    * Compara la contraseña proporcionada con la contraseña almacenada
@@ -22,11 +20,6 @@ export interface IUser extends Document {
    * @returns  Verdadero si las contraseñas coinciden, falso en caso contrario
    */
   comparePassword(candidatePassword: string): Promise<boolean>;
-
-  /**
-   * Genera un token para restablecer la contraseña
-   */
-  createPasswordResetToken(): string;
 }
 
 export interface IUserModel extends Model<IUser> {}

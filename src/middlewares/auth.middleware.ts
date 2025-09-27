@@ -11,7 +11,7 @@ interface CustomPayload extends JwtPayload {
 /**
  * Extiende la interfaz Request para incluir el usuario autenticado
  */
-interface RequestWithUser extends Request {
+export interface RequestWithUser extends Request {
   user?: CustomPayload;
 }
 

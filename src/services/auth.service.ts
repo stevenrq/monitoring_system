@@ -12,17 +12,16 @@ const ACCESS_TOKEN_EXPIRES_IN = (process.env.ACCESS_TOKEN_EXPIRES_IN ||
   "15m") as StringValue;
 const REFRESH_TOKEN_EXPIRES_IN = (process.env.REFRESH_TOKEN_EXPIRES_IN ||
   "30d") as StringValue;
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
 
 if (!ACCESS_TOKEN_SECRET || !REFRESH_TOKEN_SECRET) {
   console.error(
-    "Error fatal: Las variables de entorno para los tokens JWT no están definidas."
+    "Error fatal: Las variables de entorno para los tokens JWT no están definidas.",
   );
   process.exit(1);
 }
 
 const generateTokens = async (
-  user: IUser
+  user: IUser,
 ): Promise<{ accessToken: string; refreshToken: string }> => {
   const payload = {
     userId: user._id,
@@ -73,7 +72,7 @@ export const createAdmin = async (req: Request): Promise<IUser> => {
 };
 
 export const login = async (
-  req: Request
+  req: Request,
 ): Promise<{ accessToken: string; refreshToken: string }> => {
   const { username, password } = req.body;
 
@@ -97,7 +96,7 @@ export const login = async (
 };
 
 export const refreshToken = async (
-  oldRefreshToken: string
+  oldRefreshToken: string,
 ): Promise<{ accessToken: string; refreshToken: string }> => {
   try {
     const decoded = jwt.verify(oldRefreshToken, REFRESH_TOKEN_SECRET) as {
@@ -117,51 +116,70 @@ export const refreshToken = async (
   }
 };
 
+const generateRandomPassword = (length = 12): string => {
+  const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const lower = "abcdefghijklmnopqrstuvwxyz";
+  const digits = "0123456789";
+  const all = upper + lower + digits;
+
+  let password = "";
+  password += upper[crypto.randomInt(0, upper.length)];
+  password += lower[crypto.randomInt(0, lower.length)];
+  password += digits[crypto.randomInt(0, digits.length)];
+
+  for (let i = 3; i < length; i++) {
+    password += all[crypto.randomInt(0, all.length)];
+  }
+
+  return password
+    .split("")
+    .sort(() => 0.5 - Math.random())
+    .join("");
+};
+
 export const forgotPassword = async (email: string): Promise<void> => {
   const user = await User.findOne({ email });
   if (!user) {
-    // Para no revelar si un usuario existe o no, no lanzamos un error aquí.
-    // La función simplemente retornará y el controlador enviará una respuesta genérica.
     console.log(`Intento de recuperación para email no registrado: ${email}`);
     return;
   }
 
-  const resetToken = user.createPasswordResetToken();
+  const temporaryPassword = generateRandomPassword(12);
+  user.password = temporaryPassword;
+  user.refreshToken = undefined;
   await user.save({ validateBeforeSave: false });
 
-  const resetURL = `${FRONTEND_URL}/reset-password/${resetToken}`;
-
   const message = `
-    <h1>Has solicitado un restablecimiento de contraseña</h1>
-    <p>Haz clic en el siguiente enlace para restablecer tu contraseña. El enlace es válido por 10 minutos:</p>
-    <a href="${resetURL}" target="_blank">Restablecer Contraseña</a>
-    <p>Si no solicitaste este cambio, por favor ignora este correo.</p>
+    <h1>Recuperación de contraseña</h1>
+    <p>Se ha generado una contraseña temporal para tu cuenta. Por favor inicia sesión con esta contraseña y cámbiala inmediatamente.</p>
+    <p><strong>Contraseña temporal:</strong> ${temporaryPassword}</p>
+    <p>Este cambio fue solicitado por ti (o por alguien con acceso a tu correo). Si no fuiste tú, contacta al administrador.</p>
   `;
 
   await sendEmail({
     to: user.email!,
-    subject: "Restablecimiento de Contraseña - Sistema de Monitoreo",
+    subject: "Nueva contraseña temporal - Sistema de Monitoreo Ambiental",
     html: message,
   });
 };
 
-export const resetPassword = async (
-  token: string,
-  newPassword: string
+export const changePassword = async (
+  userId: string,
+  oldPassword: string,
+  newPassword: string,
 ): Promise<void> => {
-  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
-
-  const user = await User.findOne({
-    passwordResetToken: hashedToken,
-    passwordResetExpires: { $gt: new Date() },
-  });
-
+  const user = await User.findById(userId).select("+password +refreshToken");
   if (!user) {
-    throw new Error("El token es inválido o ha expirado.");
+    throw new Error("Usuario no encontrado");
+  }
+
+  const isMatch = await user.comparePassword(oldPassword);
+  if (!isMatch) {
+    throw new Error("La contraseña actual es incorrecta");
   }
 
   user.password = newPassword;
-  user.passwordResetToken = undefined;
-  user.passwordResetExpires = undefined;
-  await user.save();
+  user.refreshToken = undefined;
+
+  await user.save({ validateBeforeSave: false });
 };

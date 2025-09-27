@@ -8,6 +8,6 @@ router.post("/create-admin", protect, authorize("admin"), auth.createAdmin);
 router.post("/login", auth.handleLogin);
 router.post("/refresh", auth.handleRefreshToken);
 router.post("/forgot-password", auth.handleForgotPassword);
-router.post("/reset-password/:token", auth.handleResetPassword);
+router.post("/change-password", protect, auth.handleChangePassword);
 
 export default router;

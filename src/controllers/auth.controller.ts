@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import * as authService from "../services/auth.service";
+import { RequestWithUser } from "../middlewares/auth.middleware";
 
 export const createAdmin = async (req: Request, res: Response) => {
   try {
@@ -70,22 +71,26 @@ export const handleForgotPassword = async (req: Request, res: Response) => {
   }
 };
 
-export const handleResetPassword = async (req: Request, res: Response) => {
+export const handleChangePassword = async (
+  req: RequestWithUser,
+  res: Response,
+) => {
   try {
-    const { token } = req.params;
-    const { password } = req.body;
+    const userId: string = req.user?.userId; // Se obtiene el ID del usuario autenticado
+    const { oldPassword, newPassword } = req.body;
 
-    if (!password) {
-      return res.status(400).json({ error: "La nueva contraseña es requerida." });
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({ error: "Debes enviar ambas contraseñas." });
     }
 
-    await authService.resetPassword(token, password);
-    res.status(200).json({ message: "Contraseña restablecida exitosamente." });
+    await authService.changePassword(userId, oldPassword, newPassword);
+
+    res.status(200).json({ message: "Contraseña actualizada exitosamente." });
   } catch (error) {
     if (error instanceof Error) {
       res.status(400).json({ error: error.message });
     } else {
-      res.status(400).json({ error: "Error desconocido" });
+      res.status(500).json({ error: "Error desconocido" });
     }
   }
 };
