@@ -25,7 +25,7 @@ const initializeSocket = (io: Server) => {
       try {
         for (const sensorData of sensorPayload) {
           console.log(
-            `Datos del sensor recibido: ${JSON.stringify(sensorData)}`,
+            `Datos del sensor recibido: ${JSON.stringify(sensorData)}`
           );
 
           if (
@@ -69,14 +69,14 @@ const initializeSocket = (io: Server) => {
 
     socket.on("subscribeToDevice", (deviceId: string) => {
       console.log(
-        `El cliente web ${socket.id} se suscribió al dispositivo ${deviceId}`,
+        `El cliente web ${socket.id} se suscribió al dispositivo ${deviceId}`
       );
       socket.join(deviceId); // El cliente web se une a la sala para recibir actualizaciones del dispositivo
     });
 
     socket.on("unsubscribeFromDevice", (deviceId: string) => {
       console.log(
-        `El cliente web ${socket.id} se ha desuscrito del dispositivo ${deviceId}`,
+        `El cliente web ${socket.id} se ha desuscrito del dispositivo ${deviceId}`
       );
       socket.leave(deviceId); // El cliente web sale de la sala del dispositivo
     });

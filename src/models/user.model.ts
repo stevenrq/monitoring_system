@@ -1,8 +1,8 @@
 import { Schema, model } from "mongoose";
 import bcrypt from "bcryptjs";
-import { IUser, IUserModel } from "../interfaces/user.interface";
+import { IUserDocument, IUserModel } from "../interfaces/user.interface";
 
-export const UserSchema = new Schema<IUser, IUserModel>(
+export const UserSchema = new Schema<IUserDocument, IUserModel>(
   {
     name: { type: String, required: [true, "El nombre es obligatorio"] },
     lastName: { type: String, required: [true, "El apellido es obligatorio"] },
@@ -46,10 +46,10 @@ export const UserSchema = new Schema<IUser, IUserModel>(
     },
     refreshToken: { type: String, select: false },
   },
-  { timestamps: true },
+  { timestamps: true }
 );
 
-UserSchema.pre<IUser>("save", async function (next) {
+UserSchema.pre<IUserDocument>("save", async function (next) {
   if (!this.isModified("password") || !this.password) return next();
 
   try {
@@ -65,12 +65,12 @@ UserSchema.pre<IUser>("save", async function (next) {
 });
 
 UserSchema.methods.comparePassword = async function (
-  candidatePassword: string,
+  candidatePassword: string
 ): Promise<boolean> {
   if (!this.password) return false;
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-const User = model<IUser, IUserModel>("User", UserSchema);
+const User = model<IUserDocument, IUserModel>("User", UserSchema);
 
 export default User;
