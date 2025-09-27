@@ -1,6 +1,6 @@
 import { Document, model, Schema } from "mongoose";
 
-export interface ISensorData extends Document {
+export interface ISensorDataDocument extends Document {
   /**
    * ID del dispositivo al que pertenece el sensor
    */
@@ -19,7 +19,7 @@ export interface ISensorData extends Document {
   timestamp: Date;
 }
 
-const SensorDataSchema = new Schema<ISensorData>({
+const SensorDataSchema = new Schema<ISensorDataDocument>({
   deviceId: { type: String, required: true, index: true },
   sensorType: { type: String, required: true, index: true },
   value: { type: Number, required: true },
@@ -30,4 +30,4 @@ const SensorDataSchema = new Schema<ISensorData>({
 // Índice compuesto para optimizar consultas por dispositivo, tipo de sensor y tiempo
 SensorDataSchema.index({ deviceId: 1, sensorType: 1, timestamp: -1 });
 
-export default model<ISensorData>("SensorData", SensorDataSchema);
+export default model<ISensorDataDocument>("SensorData", SensorDataSchema);

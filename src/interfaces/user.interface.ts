@@ -1,10 +1,6 @@
 import { Document, Model } from "mongoose";
 
-/**
- * Interfaz que define la estructura de un usuario en la base de datos.
- * Extiende de `Document` de Mongoose para incluir propiedades de documento.
- */
-export interface IUser extends Document {
+export interface IUserDocument extends Document {
   name?: string;
   lastName?: string;
   phone?: number;
@@ -22,12 +18,12 @@ export interface IUser extends Document {
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
-export interface IUserModel extends Model<IUser> {}
+export interface IUserModel extends Model<IUserDocument> {}
 
 /**
  * Interfaz que define la estructura de los datos necesarios para crear un administrador.
  */
 export type IAdminData = Pick<
-  IUser,
+  IUserDocument,
   "name" | "lastName" | "phone" | "email" | "username" | "password" | "role"
 >;

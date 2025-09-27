@@ -1,6 +1,6 @@
 import { Schema, model, Document } from "mongoose";
 
-export interface IDevice extends Document {
+export interface IDeviceDocument extends Document {
   deviceId: string;
   name: string;
   location: string;
@@ -11,11 +11,11 @@ export interface IDevice extends Document {
   sensors: Schema.Types.ObjectId[];
 }
 
-const DeviceSchema = new Schema<IDevice>({
+const DeviceSchema = new Schema<IDeviceDocument>({
   deviceId: { type: String, required: true, unique: true },
   name: { type: String, required: true },
   location: { type: String, required: true },
   sensors: [{ type: Schema.Types.ObjectId, ref: "Sensor" }],
 });
 
-export default model<IDevice>("Device", DeviceSchema);
+export default model<IDeviceDocument>("Device", DeviceSchema);
