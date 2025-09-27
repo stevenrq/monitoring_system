@@ -1,6 +1,5 @@
 import { Schema, model } from "mongoose";
 import bcrypt from "bcryptjs";
-import crypto from "crypto";
 import { IUser, IUserModel } from "../interfaces/user.interface";
 
 export const UserSchema = new Schema<IUser, IUserModel>(
@@ -46,8 +45,6 @@ export const UserSchema = new Schema<IUser, IUserModel>(
       default: "user",
     },
     refreshToken: { type: String, select: false },
-    passwordResetToken: String,
-    passwordResetExpires: Date,
   },
   { timestamps: true },
 );
@@ -72,20 +69,6 @@ UserSchema.methods.comparePassword = async function (
 ): Promise<boolean> {
   if (!this.password) return false;
   return await bcrypt.compare(candidatePassword, this.password);
-};
-
-UserSchema.methods.createPasswordResetToken = function (): string {
-  const resetToken = crypto.randomBytes(32).toString("hex");
-
-  this.passwordResetToken = crypto
-    .createHash("sha256")
-    .update(resetToken)
-    .digest("hex");
-
-  // El token expira en 10 minutos
-  this.passwordResetExpires = new Date(Date.now() + 10 * 60 * 1000);
-
-  return resetToken;
 };
 
 const User = model<IUser, IUserModel>("User", UserSchema);

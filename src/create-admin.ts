@@ -4,7 +4,6 @@
  */
 import dotenv from "dotenv";
 import mongoose from "mongoose";
-import bcrypt from "bcryptjs";
 import { IAdminData } from "./interfaces/user.interface";
 import User from "./models/user.model";
 
@@ -47,8 +46,6 @@ async function createAdmin(): Promise<void> {
       return;
     }
 
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password ?? "", salt);
     console.log("Contraseña hasheada exitosamente.");
 
     const adminUser = new User({
@@ -57,7 +54,7 @@ async function createAdmin(): Promise<void> {
       phone,
       email,
       username,
-      password: hashedPassword,
+      password,
       role: role,
     });
 
