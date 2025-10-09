@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import * as authService from "../services/auth.service";
 import { RequestWithUser } from "../middlewares/auth.middleware";
+import User from "../models/user.model";
 
 export const createAdmin = async (req: Request, res: Response) => {
   try {
@@ -75,6 +76,10 @@ export const handleChangePassword = async (
   res: Response,
 ) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Usuario no autenticado." });
+    }
+
     const userId: string = req.user?.userId; // Se obtiene el ID del usuario autenticado
     const { oldPassword, newPassword } = req.body;
 
@@ -85,6 +90,28 @@ export const handleChangePassword = async (
     await authService.changePassword(userId, oldPassword, newPassword);
 
     res.status(200).json({ message: "Contraseña actualizada exitosamente." });
+  } catch (error) {
+    if (error instanceof Error) {
+      res.status(400).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: "Error desconocido" });
+    }
+  }
+};
+
+export const getAuthenticatedUser = async (
+  req: RequestWithUser,
+  res: Response,
+) => {
+  try {
+    if (!req.user?.userId) {
+      return res.status(401).json({ error: "Usuario no autenticado." });
+    }
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ error: "Usuario no encontrado." });
+    }
+    res.status(200).json(user);
   } catch (error) {
     if (error instanceof Error) {
       res.status(400).json({ error: error.message });
