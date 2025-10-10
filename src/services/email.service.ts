@@ -1,3 +1,4 @@
+import "../config/index";
 import sgMail from "@sendgrid/mail";
 
 interface EmailOptions {

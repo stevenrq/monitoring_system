@@ -1,3 +1,4 @@
+import "../config/index";
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { JwtCustomPayload } from "../interfaces/jwt-custom-payload";
