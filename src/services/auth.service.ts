@@ -1,3 +1,4 @@
+import "../config/index";
 import { Request } from "express";
 import jwt from "jsonwebtoken";
 import { IUserDocument } from "../interfaces/user.interface";

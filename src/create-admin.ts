@@ -2,12 +2,17 @@
  * Script para crear un usuario administrador en la base de datos MongoDB.
  * El uso de este script es solo para fines de desarrollo y pruebas.
  */
-import dotenv from "dotenv";
+import "./config/index";
 import mongoose from "mongoose";
 import { IAdminData } from "./interfaces/user.interface";
 import User from "./models/user.model";
 
-dotenv.config();
+const MONGO_URI: string | undefined = process.env.MONGO_URI;
+
+if (!process.env.MONGO_URI) {
+  console.error("La variable MONGO_URI no está definida");
+  process.exit(1);
+}
 
 async function createAdmin(): Promise<void> {
   // NOTA: Se debe asegurar que las propiedades coincidan con el esquema definido en src/models/user.model.ts
@@ -25,14 +30,10 @@ async function createAdmin(): Promise<void> {
 
   console.log(`Intentando crear al administrador: '${username}'...`);
 
-  const MONGO_URI = process.env.MONGO_URI;
-  if (!MONGO_URI) {
-    console.error("La variable MONGO_URI no está definida en tu archivo .env");
-    process.exit(1);
-  }
-
   try {
-    await mongoose.connect(MONGO_URI);
+    if (MONGO_URI != null) {
+      await mongoose.connect(MONGO_URI);
+    }
     console.log("Conectado a la base de datos MongoDB.");
 
     const existingAdmin = await User.findOne({

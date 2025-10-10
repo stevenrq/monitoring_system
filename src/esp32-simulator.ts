@@ -1,8 +1,14 @@
+import "./config/index";
 import { io, Socket } from "socket.io-client";
 import { SensorPayload } from "./interfaces/sensor-payload";
 
-const SERVER_URL = `${process.env.BACKEND_URL}/devices`;
 const SIMULATION_INTERVAL_MS = 1000;
+const SERVER_URL: string | undefined = `${process.env.BACKEND_URL}/devices`;
+
+if (!process.env.BACKEND_URL) {
+  console.error("La variable BACKEND_URL no está definida");
+  process.exit(1);
+}
 
 // Configuración para cada dispositivo simulado
 const deviceConfig = {
