@@ -1,0 +1,1514 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Sistema de Monitoreo Ambiental - API",
+    "version": "1.0",
+    "description": "Documentación de la API del sistema de monitoreo ambiental."
+  },
+  "servers": [
+    {
+      "url": "https://monitoring-system-opbd.onrender.com/api",
+      "description": "Servidor de producción",
+      "variables": {
+        "backendUrl": {
+          "default": "https://monitoring-system-opbd.onrender.com",
+          "description": "URL base del backend."
+        }
+      }
+    },
+    {
+      "url": "http://localhost:3000/api",
+      "description": "Servidor principal de la API",
+      "variables": {
+        "backendUrl": {
+          "default": "http://localhost:3000",
+          "description": "URL base del backend."
+        }
+      }
+    }
+  ],
+  "tags": [
+    {
+      "name": "Autenticación",
+      "description": "Gestión de acceso, tokens y recuperación de credenciales"
+    },
+    {
+      "name": "Usuarios",
+      "description": "Administración de cuentas de usuario"
+    },
+    {
+      "name": "Plantas",
+      "description": "Gestión de plantas monitoreadas"
+    },
+    {
+      "name": "Sensores",
+      "description": "Consultas de lecturas y reportes de sensores"
+    }
+  ],
+  "paths": {
+    "/api/auth/login": {
+      "post": {
+        "tags": ["Autenticación"],
+        "summary": "Inicia sesión y obtiene un token de acceso",
+        "description": "Valida las credenciales del usuario y entrega un token de acceso en formato JWT. También envía una cookie segura con el refresh token.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredencialesLogin"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Inicio de sesión exitoso.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accessToken": {
+                      "type": "string",
+                      "description": "Token JWT vigente para autenticación."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "No se pudo iniciar sesión.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "tags": ["Autenticación"],
+        "summary": "Genera un nuevo par de tokens",
+        "description": "Usa el refresh token (enviado mediante cookie) para generar un nuevo token de acceso y un nuevo refresh token.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tokens generados correctamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokensRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Refresh token ausente, inválido o expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/forgot-password": {
+      "post": {
+        "tags": ["Autenticación"],
+        "summary": "Solicita el restablecimiento de contraseña",
+        "description": "Envía una contraseña temporal al correo asociado. El flujo no revela si el correo existe en el sistema.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SolicitudOlvidoPassword"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Solicitud procesada correctamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MensajeRespuesta"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "No se pudo enviar el correo de restablecimiento.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/change-password": {
+      "post": {
+        "tags": ["Autenticación"],
+        "summary": "Cambia la contraseña del usuario autenticado",
+        "description": "Requiere un token de acceso válido. Invalida el refresh token previo para reforzar la seguridad.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SolicitudCambioPassword"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Contraseña actualizada correctamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MensajeRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos incompletos o contraseña actual incorrecta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Usuario no autenticado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/authenticated-user": {
+      "get": {
+        "tags": ["Autenticación"],
+        "summary": "Obtiene la información del usuario autenticado",
+        "description": "Devuelve los datos del usuario asociado al token de acceso proporcionado.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usuario autenticado encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsuarioRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token inválido o ausente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Usuario no encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/create-admin": {
+      "post": {
+        "tags": ["Autenticación"],
+        "summary": "Crea una nueva cuenta con rol administrador",
+        "description": "Solo los usuarios con rol administrador pueden crear nuevas cuentas administrativas.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/UsuarioBase"
+                  }
+                ],
+                "required": [
+                  "name",
+                  "lastName",
+                  "phone",
+                  "email",
+                  "username",
+                  "password"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Administrador creado correctamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsuarioRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos o usuario duplicado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente o inválido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "El usuario autenticado no tiene permisos de administrador.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users": {
+      "post": {
+        "tags": ["Usuarios"],
+        "summary": "Crea un nuevo usuario",
+        "description": "Solo administradores pueden registrar usuarios. La contraseña se cifra antes de guardarse.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/UsuarioBase"
+                  }
+                ],
+                "required": [
+                  "name",
+                  "lastName",
+                  "phone",
+                  "email",
+                  "username",
+                  "password"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Usuario creado correctamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsuarioRespuestaConMensaje"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La información proporcionada no es válida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente o inválido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol sin privilegios de administrador.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": ["Usuarios"],
+        "summary": "Lista a todos los usuarios",
+        "description": "Solo administradores pueden consultar la lista completa de usuarios.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de usuarios recuperada correctamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UsuarioRespuesta"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente o inválido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol sin privilegios de administrador.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/{id}": {
+      "get": {
+        "tags": ["Usuarios"],
+        "summary": "Obtiene un usuario por su ID",
+        "description": "Devuelve la información completa del usuario solicitado.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador único del usuario."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usuario encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsuarioRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente o inválido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol sin privilegios de administrador.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Usuario no encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["Usuarios"],
+        "summary": "Actualiza un usuario existente",
+        "description": "Permite modificar la información de un usuario. Los campos que no se envíen permanecerán sin cambios.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador único del usuario."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UsuarioBase"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Usuario actualizado correctamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsuarioRespuestaConMensaje"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente o inválido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol sin privilegios de administrador.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Usuario no encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Usuarios"],
+        "summary": "Elimina un usuario",
+        "description": "Borra permanentemente al usuario indicado. Esta acción no se puede deshacer.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador único del usuario."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usuario eliminado correctamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MensajeRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente o inválido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol sin privilegios de administrador.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Usuario no encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/plants": {
+      "post": {
+        "tags": ["Plantas"],
+        "summary": "Crea una nueva planta",
+        "description": "Registra una planta que será monitoreada. Solo accesible para administradores.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlantaBase"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Planta creada correctamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlantaRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente o inválido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol sin privilegios de administrador.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": ["Plantas"],
+        "summary": "Obtiene todas las plantas",
+        "description": "Recupera la lista completa de plantas registradas en el sistema.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Listado de plantas recuperado correctamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlantaRespuesta"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente o inválido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol sin privilegios de administrador.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error al consultar las plantas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/plants/{id}": {
+      "get": {
+        "tags": ["Plantas"],
+        "summary": "Obtiene una planta por ID",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador único de la planta."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Planta encontrada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlantaRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente o inválido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol sin privilegios de administrador.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Planta no encontrada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["Plantas"],
+        "summary": "Actualiza la información de una planta",
+        "description": "Permite modificar los datos de una planta existente.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador único de la planta."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlantaBase"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Planta actualizada correctamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Planta actualizada exitosamente"
+                    },
+                    "plant": {
+                      "$ref": "#/components/schemas/PlantaRespuesta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente o inválido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol sin privilegios de administrador.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Planta no encontrada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Plantas"],
+        "summary": "Elimina una planta",
+        "description": "Borra permanentemente la planta del sistema.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador único de la planta."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Planta eliminada correctamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MensajeRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente o inválido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol sin privilegios de administrador.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Planta no encontrada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sensor-data/latest": {
+      "get": {
+        "tags": ["Sensores"],
+        "summary": "Obtiene la última lectura de cada sensor",
+        "description": "Devuelve la lectura más reciente por combinación de dispositivo y tipo de sensor. Opcionalmente se puede filtrar por un dispositivo específico.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "deviceId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID del dispositivo para filtrar las lecturas."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lecturas recuperadas correctamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LecturaSensor"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Parámetros inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sensor-data/report": {
+      "get": {
+        "tags": ["Sensores"],
+        "summary": "Genera un reporte estadístico de sensores",
+        "description": "Calcula valores mínimos, máximos y promedio por sensor. Se puede filtrar por dispositivo, tipo de sensor y rango de fechas.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "deviceId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID del dispositivo a filtrar."
+          },
+          {
+            "in": "query",
+            "name": "sensorType",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Tipo de sensor (por ejemplo, temperatura, humedad)."
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Fecha inicial del rango en formato ISO 8601."
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Fecha final del rango en formato ISO 8601."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reporte generado correctamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReporteSensor"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Parámetros inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sensor-data/raw": {
+      "get": {
+        "tags": ["Sensores"],
+        "summary": "Obtiene los datos crudos de sensores",
+        "description": "Devuelve lecturas individuales sin agregaciones. Permite limitar el número de resultados y filtrar por dispositivo, tipo de sensor y rango de fechas.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "deviceId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID del dispositivo para filtrar resultados."
+          },
+          {
+            "in": "query",
+            "name": "sensorType",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Tipo de sensor (por ejemplo, temperatura, humedad)."
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Fecha inicial del rango en formato ISO 8601."
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Fecha final del rango en formato ISO 8601."
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Número máximo de registros a devolver. Por defecto 100."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Datos recuperados correctamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DatoSensorCrudo"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Parámetros inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Incluye el token JWT obtenido al iniciar sesión en el encabezado `Authorization: Bearer <token>`."
+      },
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "refreshToken",
+        "description": "Cookie HTTP con el refresh token emitido en el inicio de sesión."
+      }
+    },
+    "schemas": {
+      "CredencialesLogin": {
+        "type": "object",
+        "required": ["username", "password"],
+        "properties": {
+          "username": {
+            "type": "string",
+            "example": "admin",
+            "description": "Nombre de usuario registrado."
+          },
+          "password": {
+            "type": "string",
+            "example": "ContraseñaSegura123",
+            "description": "Contraseña correspondiente al usuario."
+          }
+        }
+      },
+      "TokensRespuesta": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "Token JWT para autenticación en peticiones protegidas."
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "Token JWT de larga duración. Se entrega únicamente en el endpoint de refresco."
+          }
+        },
+        "example": {
+          "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+          "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        }
+      },
+      "SolicitudOlvidoPassword": {
+        "type": "object",
+        "required": ["email"],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "usuario@correo.com",
+            "description": "Correo electrónico asociado a la cuenta cuya contraseña se desea restablecer."
+          }
+        }
+      },
+      "SolicitudCambioPassword": {
+        "type": "object",
+        "required": ["oldPassword", "newPassword"],
+        "properties": {
+          "oldPassword": {
+            "type": "string",
+            "example": "ContraseñaActual123",
+            "description": "Contraseña actual del usuario."
+          },
+          "newPassword": {
+            "type": "string",
+            "example": "NuevaContraseñaSegura456",
+            "description": "Nueva contraseña que sustituirá a la contraseña actual."
+          }
+        }
+      },
+      "UsuarioBase": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "María",
+            "description": "Nombre del usuario."
+          },
+          "lastName": {
+            "type": "string",
+            "example": "García",
+            "description": "Apellido del usuario."
+          },
+          "phone": {
+            "type": "number",
+            "example": 5551234567,
+            "description": "Número telefónico de 10 dígitos."
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "maria.garcia@correo.com",
+            "description": "Correo electrónico único."
+          },
+          "username": {
+            "type": "string",
+            "example": "maria.garcia",
+            "description": "Nombre de usuario único."
+          },
+          "password": {
+            "type": "string",
+            "example": "ContraseñaSegura123",
+            "description": "Contraseña con mínimo 6 caracteres."
+          },
+          "role": {
+            "type": "string",
+            "enum": ["user", "admin"],
+            "example": "user",
+            "description": "Rol asignado al usuario."
+          }
+        }
+      },
+      "UsuarioRespuesta": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/UsuarioBase"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "_id": {
+                "type": "string",
+                "example": "64f0c2e03f0c4d0021a4b57d"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        ]
+      },
+      "UsuarioRespuestaConMensaje": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Usuario creado exitosamente"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UsuarioRespuesta"
+          }
+        }
+      },
+      "PlantaBase": {
+        "type": "object",
+        "required": ["name", "description", "quantity"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Helecho de Boston",
+            "description": "Nombre de la planta."
+          },
+          "description": {
+            "type": "string",
+            "example": "Planta ideal para interiores con sombra.",
+            "description": "Descripción general de la planta."
+          },
+          "quantity": {
+            "type": "integer",
+            "example": 15,
+            "description": "Cantidad de ejemplares registrados."
+          }
+        }
+      },
+      "PlantaRespuesta": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PlantaBase"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "_id": {
+                "type": "string",
+                "example": "64f0c3413f0c4d0021a4b580"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        ]
+      },
+      "LecturaSensor": {
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "example": "ESP32-001"
+          },
+          "sensorType": {
+            "type": "string",
+            "example": "temperatura"
+          },
+          "value": {
+            "type": "number",
+            "example": 24.3
+          },
+          "unit": {
+            "type": "string",
+            "example": "°C"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ReporteSensor": {
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "example": "ESP32-001"
+          },
+          "sensorType": {
+            "type": "string",
+            "example": "humedad"
+          },
+          "unit": {
+            "type": "string",
+            "example": "%"
+          },
+          "samples": {
+            "type": "integer",
+            "example": 120
+          },
+          "minValue": {
+            "type": "number",
+            "example": 40.1
+          },
+          "maxValue": {
+            "type": "number",
+            "example": 68.3
+          },
+          "averageValue": {
+            "type": "number",
+            "example": 55.2
+          },
+          "firstTimestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastTimestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "latestValue": {
+            "type": "number",
+            "example": 60.5
+          }
+        }
+      },
+      "DatoSensorCrudo": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/LecturaSensor"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "_id": {
+                "type": "string",
+                "example": "64f0c3f03f0c4d0021a4b589"
+              }
+            }
+          }
+        ]
+      },
+      "MensajeRespuesta": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Operación realizada correctamente"
+          }
+        }
+      },
+      "ErrorRespuesta": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "example": "No se pudo completar la operación."
+          }
+        }
+      }
+    }
+  }
+}
