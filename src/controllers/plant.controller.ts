@@ -61,11 +61,24 @@ export const updatePlant = async (req: Request, res: Response) => {
 
 export const deletePlant = async (req: Request, res: Response) => {
   try {
-    const plant = await plantService.deletPlant(req.params.id);
+    const plant = await plantService.deletePlant(req.params.id);
     if (!plant) {
       return res.status(404).json({ message: "Planta no encontrada" });
     }
     res.status(200).json({ message: "Planta eliminada exitosamente" });
+  } catch (error) {
+    if (error instanceof Error) {
+      res.status(500).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: "Error desconocido" });
+    }
+  }
+};
+
+export const getPlantCount = async (req: Request, res: Response) => {
+  try {
+    const count = await plantService.getPlantCount();
+    res.status(200).json({ count });
   } catch (error) {
     if (error instanceof Error) {
       res.status(500).json({ error: error.message });

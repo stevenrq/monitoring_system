@@ -8,6 +8,13 @@ router.post("/", protect, authorize("admin"), plantController.createPlant);
 
 router.get("/", protect, authorize("admin"), plantController.getAllPlants);
 
+router.get(
+  "/count",
+  protect,
+  authorize("admin"),
+  plantController.getPlantCount,
+);
+
 router.get("/:id", protect, authorize("admin"), plantController.getPlantById);
 
 router.put("/:id", protect, authorize("admin"), plantController.updatePlant);
