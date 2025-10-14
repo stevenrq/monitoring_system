@@ -2,34 +2,38 @@ import { IPlantDocument } from "../interfaces/plant.interface";
 import Plant from "../models/plant.model";
 
 export const createPlant = async (
-  plantData: Required<IPlantDocument>
+  plantData: Required<IPlantDocument>,
 ): Promise<IPlantDocument> => {
   const newPlant = new Plant(plantData);
   return await newPlant.save();
 };
 
 export const getAllPlants = async (): Promise<IPlantDocument[]> => {
-  return await Plant.find();
+  return Plant.find();
 };
 
 export const getPlantById = async (
-  plantId: string
+  plantId: string,
 ): Promise<IPlantDocument | null> => {
-  return await Plant.findById(plantId);
+  return Plant.findById(plantId);
 };
 
 export const updatePlant = async (
   plantId: string,
-  updateData: Partial<IPlantDocument>
+  updateData: Partial<IPlantDocument>,
 ): Promise<IPlantDocument | null> => {
-  return await Plant.findByIdAndUpdate(plantId, updateData, {
+  return Plant.findByIdAndUpdate(plantId, updateData, {
     new: true,
     runValidators: true,
   });
 };
 
-export const deletPlant = async (
-  plantId: string
+export const deletePlant = async (
+  plantId: string,
 ): Promise<IPlantDocument | null> => {
-  return await Plant.findByIdAndDelete(plantId);
+  return Plant.findByIdAndDelete(plantId);
+};
+
+export const getPlantCount = async (): Promise<number | null> => {
+  return Plant.countDocuments();
 };
