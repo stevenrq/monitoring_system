@@ -1,90 +1,104 @@
-import { Server, Socket } from "socket.io";
+import { WebSocketServer, WebSocket } from "ws";
 import SensorData from "../models/sensor-data.model";
 import { SensorPayload } from "../interfaces/sensor-payload";
 import { checkSensorDataForAlerts } from "../services/notification.service";
+import * as http from "node:http";
 
-/**
- * Inicializa los manejadores de eventos de Socket.IO para diferentes namespaces.
- * Configura la lógica para la conexión de dispositivos y clientes web,
- * así como el manejo de datos de sensores y suscripciones.
- * @param io Instancia del servidor de Socket.IO.
- */
-const initializeSocket = (io: Server) => {
-  const devicesNamespace = io.of("/devices");
-  const webClientsNamespace = io.of("/web-clients");
+export function initializeWebSocket(server: http.Server) {
+  const wss = new WebSocketServer({ server });
 
-  devicesNamespace.on("connection", (socket: Socket) => {
-    console.log(`Un dispositivo se ha conectado: ${socket.id}`);
+  const connectedDevices = new Map<string, WebSocket>();
+  const webClients = new Set<WebSocket>();
 
-    socket.on("registerDevice", (deviceId: string) => {
-      console.log(`Dispositivo con ID '${deviceId}' se ha registrado.`);
-      socket.join(deviceId); // El dispositivo se une a una sala con su deviceId
-    });
+  wss.on("connection", (ws: WebSocket, req) => {
+    const path = req.url || "/";
+    console.log(`✅ Nueva conexión: ${path}`);
 
-    socket.on("sensorData", async (sensorPayload: SensorPayload[]) => {
+    if (path !== "/") {
+      console.log("❌ Conexión rechazada: ruta no válida");
+      ws.close();
+      return;
+    }
+
+    ws.on("message", async (msg) => {
       try {
-        for (const sensorData of sensorPayload) {
-          console.log(
-            `Datos del sensor recibido: ${JSON.stringify(sensorData)}`
-          );
+        const data = JSON.parse(msg.toString());
 
-          if (
-            !sensorData.deviceId ||
-            !sensorData.sensorType ||
-            sensorData.value == undefined ||
-            !sensorData.unit
-          ) {
-            socket.emit("dataError", { message: "Payload inválido" });
-            return;
+        // Registro de dispositivo
+        if (data.event === "registerDevice") {
+          connectedDevices.set(data.deviceId, ws);
+          console.log(`📡 Dispositivo registrado: ${data.deviceId}`);
+          return;
+        }
+
+        // Suscripción de clientes web
+        if (data.event === "subscribeToDevice") {
+          webClients.add(ws);
+          console.log(`👨‍💻 Cliente suscrito a ${data.deviceId}`);
+          return;
+        }
+
+        // Procesar datos de sensores
+        if (Array.isArray(data)) {
+          for (const sensorData of data as SensorPayload[]) {
+            const { deviceId, sensorType, value, unit } = sensorData;
+
+            if (!deviceId || !sensorType || value === undefined || !unit) {
+              ws.send(
+                JSON.stringify({
+                  event: "dataError",
+                  message: "Payload inválido",
+                })
+              );
+              continue;
+            }
+
+            // Guardar datos
+            const newSensorData = new SensorData(sensorData);
+            await newSensorData.save();
+            console.log(`💾 Datos guardados de ${deviceId}:`, sensorData);
+
+            // Enviar a clientes web
+            const payload = JSON.stringify({
+              event: "newSensorData",
+              data: sensorData,
+            });
+            for (const client of webClients) {
+              if (client.readyState === WebSocket.OPEN) client.send(payload);
+            }
+
+            // Verificar alertas
+            checkSensorDataForAlerts(wss, sensorData);
           }
 
-          const newSensorData = new SensorData({
-            deviceId: sensorData.deviceId,
-            sensorType: sensorData.sensorType,
-            value: sensorData.value,
-            unit: sensorData.unit,
-          });
-          await newSensorData.save();
-          console.log("Datos del sensorData guardados en la base de datos");
-
-          io.of("/web-clients")
-            .to(sensorData.deviceId)
-            .emit("newSensorData", sensorData);
-
-          checkSensorDataForAlerts(io, sensorData);
+          // Confirmación al dispositivo
+          ws.send(
+            JSON.stringify({
+              event: "ack",
+              message: "✅ Datos recibidos correctamente",
+            })
+          );
         }
-      } catch (error) {
-        console.error("Error al procesar los datos del sensor:", error);
-        socket.emit("dataError", { message: "Error al procesar los datos" });
+      } catch (err) {
+        console.error("❌ Error al procesar mensaje:", err);
+        ws.send(
+          JSON.stringify({
+            event: "dataError",
+            message: "Error al procesar datos",
+          })
+        );
       }
     });
 
-    socket.on("disconnect", () => {
-      console.log(`Un dispositivo se ha desconectado: ${socket.id}`);
+    ws.on("close", () => {
+      console.log("🔌 Conexión cerrada");
+      for (const [id, sock] of connectedDevices.entries()) {
+        if (sock === ws) connectedDevices.delete(id);
+      }
+      webClients.delete(ws);
     });
   });
 
-  webClientsNamespace.on("connection", (socket: Socket) => {
-    console.log(`Un cliente web se ha conectado: ${socket.id}`);
-
-    socket.on("subscribeToDevice", (deviceId: string) => {
-      console.log(
-        `El cliente web ${socket.id} se suscribió al dispositivo ${deviceId}`
-      );
-      socket.join(deviceId); // El cliente web se une a la sala para recibir actualizaciones del dispositivo
-    });
-
-    socket.on("unsubscribeFromDevice", (deviceId: string) => {
-      console.log(
-        `El cliente web ${socket.id} se ha desuscrito del dispositivo ${deviceId}`
-      );
-      socket.leave(deviceId); // El cliente web sale de la sala del dispositivo
-    });
-
-    socket.on("disconnect", () => {
-      console.log(`Un cliente web se ha desconectado: ${socket.id}`);
-    });
-  });
-};
-
-export default initializeSocket;
+  console.log("🧠 WebSocket inicializado correctamente");
+  return wss;
+}

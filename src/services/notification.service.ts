@@ -1,4 +1,4 @@
-import { Server } from "socket.io";
+import { WebSocketServer, WebSocket } from "ws";
 import { SensorPayload } from "../interfaces/sensor-payload";
 
 interface Threshold {
@@ -7,76 +7,91 @@ interface Threshold {
 }
 
 /**
- * Objeto para almacenar la última vez que se envió una alerta por cada combinación de dispositivo y tipo de sensor.
- * Esto ayuda a evitar el envío excesivo de alertas (cooldown).
+ * Últimos tiempos de alerta enviados, para evitar spam (cooldown).
  */
 const lastAlerts: Record<string, number> = {};
 
+/**
+ * Tiempo mínimo entre alertas del mismo tipo para el mismo dispositivo (en ms).
+ */
 const ALERT_COOLDOWN_MS = 60000;
 
 /**
- * Objeto que contiene los umbrales de alerta para diferentes sensores.
+ * Umbrales por tipo de sensor.
  */
 const alertThresholds: Record<string, Threshold> = {
-  temperature: { min: 18, max: 28 },
-  humidity: { max: 80 },
-  air_quality: { max: 400 },
-  hydrological_flow: { min: 10 },
+  temperature: { min: 10, max: 40 },
+  humidity: { min: 25, max: 80 },
+  water_level: { min: 20, max: 90 },
 };
 
 /**
- * Evalúa los datos de un sensor y emite una alerta si se superan los umbrales.
- * @param io Instancia del servidor de Socket.IO.
- * @param sensorData Datos del sensor a evaluar.
+ * Envía alertas a todos los clientes web conectados si los datos superan los umbrales.
+ * @param wss Instancia del WebSocketServer (de la librería `ws`).
+ * @param sensorData Datos del sensor.
  */
 export const checkSensorDataForAlerts = (
-  io: Server,
-  sensorData: SensorPayload,
+  wss: WebSocketServer,
+  sensorData: SensorPayload
 ) => {
   const { deviceId, sensorType, value, unit } = sensorData;
   const thresholds = alertThresholds[sensorType];
-
-  if (!thresholds) {
-    return;
-  }
+  if (!thresholds) return;
 
   let alertMessage: string | null = null;
 
   if (thresholds.max !== undefined && value > thresholds.max) {
-    alertMessage = `¡Alerta en ${deviceId}! ${getSensorName(sensorType)} ha superado el umbral máximo: ${value.toFixed(2)} ${unit} (Máximo: ${thresholds.max} ${unit}).`;
+    alertMessage = `⚠️ ¡Alerta en ${deviceId}! ${getSensorName(sensorType)} ha superado el máximo: ${value.toFixed(
+      2
+    )} ${unit} (Máx: ${thresholds.max} ${unit}).`;
   } else if (thresholds.min !== undefined && value < thresholds.min) {
-    alertMessage = `¡Alerta en ${deviceId}! ${getSensorName(sensorType)} está por debajo del umbral mínimo: ${value.toFixed(2)} ${unit} (Mínimo: ${thresholds.min} ${unit}).`;
+    alertMessage = `⚠️ ¡Alerta en ${deviceId}! ${getSensorName(sensorType)} está por debajo del mínimo: ${value.toFixed(
+      2
+    )} ${unit} (Mín: ${thresholds.min} ${unit}).`;
   }
 
-  if (alertMessage) {
-    const alertKey = `${deviceId}-${sensorType}`;
-    const now = Date.now();
-    const lastAlertTimestamp = lastAlerts[alertKey];
+  if (!alertMessage) return;
 
-    if (!lastAlertTimestamp || now - lastAlertTimestamp > ALERT_COOLDOWN_MS) {
-      console.log(`ALERTA GENERADA: ${alertMessage}`);
-      const alertPayload = {
-        deviceId,
-        message: alertMessage,
-        timestamp: new Date().toISOString(),
-      };
+  const alertKey = `${deviceId}-${sensorType}`;
+  const now = Date.now();
+  const lastAlertTimestamp = lastAlerts[alertKey];
 
-      // Emitir el evento de alerta a los clientes web suscritos a este dispositivo
-      io.of("/web-clients").to(deviceId).emit("sensorAlert", alertPayload);
+  // Si la última alerta fue hace menos de el cooldown, no enviar otra
+  if (lastAlertTimestamp && now - lastAlertTimestamp < ALERT_COOLDOWN_MS) {
+    return;
+  }
 
-      lastAlerts[alertKey] = now;
-    } else {
-      console.log(`Alerta para ${alertKey} en enfriamiento. No se enviará.`);
+  // Registrar la alerta
+  lastAlerts[alertKey] = now;
+
+  console.log(`🚨 ALERTA: ${alertMessage}`);
+
+  const alertPayload = {
+    event: "sensorAlert",
+    deviceId,
+    message: alertMessage,
+    timestamp: new Date().toISOString(),
+  };
+
+  // Enviar a todos los clientes conectados
+  const payloadStr = JSON.stringify(alertPayload);
+  for (const client of wss.clients) {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(payloadStr);
     }
   }
 };
 
+/**
+ * Obtiene el nombre legible de un tipo de sensor.
+ * @param sensorType Tipo de sensor.
+ * @returns Nombre legible del sensor.
+ */
 function getSensorName(sensorType: string): string {
   const names: { [key: string]: string } = {
     temperature: "La Temperatura",
     humidity: "La Humedad",
-    air_quality: "La Calidad del Aire",
-    hydrological_flow: "El Caudal Hidrológico",
+    water_level: "El Nivel de Agua",
   };
   return names[sensorType] || sensorType;
 }

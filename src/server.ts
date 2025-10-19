@@ -1,23 +1,30 @@
 import "./config/index";
 import app from "./app";
 import * as http from "node:http";
-import { Server as SocketIOServer } from "socket.io";
-import initializeSocket from "./socket/socket.handler";
+import os from "node:os";
+import { initializeWebSocket } from "./socket/socket.handler";
 
 const PORT = process.env.PORT || 3000;
 
-const httpServer = http.createServer(app);
+const server = http.createServer(app);
 
-const io = new SocketIOServer(httpServer, {
-  cors: {
-    origin: "*", // Permite todas las conexiones
-    methods: ["GET", "POST"],
-  },
-});
+initializeWebSocket(server);
 
-initializeSocket(io);
+function getLocalIP(): string {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]!) {
+      if (iface.family === "IPv4" && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  return "localhost";
+}
 
-httpServer.listen(PORT, () => {
-  console.log(`Servidor corriendo en el puerto ${PORT}`);
-  console.log("Servidor de WebSockets escuchando...");
+const localIP = getLocalIP();
+
+server.listen(PORT, () => {
+  console.log(`🚀 Servidor escuchando en puerto ${PORT}`);
+  console.log(`🌐 WebSocket activo en ws://${localIP}:${PORT}`);
 });
