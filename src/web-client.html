@@ -8,8 +8,6 @@
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
-      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
-      crossorigin="anonymous"
     />
     <!-- Bootstrap Icons -->
     <link
@@ -65,9 +63,7 @@
         </div>
       </div>
 
-      <div id="devices-container">
-        <!-- Las tarjetas de los dispositivos se insertarán aquí -->
-      </div>
+      <div id="devices-container"></div>
 
       <div class="mt-4">
         <h5>Log de Conexión:</h5>
@@ -75,181 +71,92 @@
       </div>
     </div>
 
-    <script src="https://cdn.socket.io/4.7.5/socket.io.js"></script>
-    <script
-      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
-      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
-      crossorigin="anonymous"
-    ></script>
-
     <script>
       const logs = document.getElementById("logs");
       const deviceIdInput = document.getElementById("deviceIdInput");
       const subscribeBtn = document.getElementById("subscribeBtn");
       const devicesContainer = document.getElementById("devices-container");
-
       const subscribedDevices = new Set();
 
-      const socket = io(
-        "https://monitoring-system-opbd.onrender.com/web-clients",
-      );
+      const WS_URL = "wss://monitoring-system-opbd.onrender.com";
+      const socket = new WebSocket(WS_URL);
 
-      document.addEventListener("DOMContentLoaded", () => {
-        if ("Notification" in window && Notification.permission !== "granted") {
-          Notification.requestPermission();
-        }
-      });
+      socket.onopen = () => {
+        logMessage("✅ Conectado al servidor WebSocket.");
+      };
 
-      function showNotification(title, body) {
-        if (!("Notification" in window)) {
-          alert("Este navegador no soporta notificaciones de escritorio.");
-          return;
-        }
+      socket.onclose = (event) => {
+        logMessage(`❌ Desconectado del servidor (${event.code}).`);
+      };
 
-        if (Notification.permission === "granted") {
-          new Notification(title, { body });
-        } else if (Notification.permission !== "denied") {
-          Notification.requestPermission().then((permission) => {
-            if (permission === "granted") {
-              new Notification(title, { body });
-            }
-          });
-        }
-      }
+      socket.onerror = (err) => {
+        logMessage(`⚠️ Error en WebSocket: ${err.message || err}`);
+      };
 
-      // Escuchar el nuevo evento de alerta del servidor
-      socket.on("sensorAlert", (alert) => {
-        const { deviceId, message } = alert;
-        logMessage(`<strong>ALERTA RECIBIDA:</strong> ${message}`);
-        showNotification(`Alerta del Dispositivo ${deviceId}`, message);
+      socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
 
-        // Opcional: Resaltar la tarjeta del dispositivo que generó la alerta
-        const alertCard = document.getElementById(`device-${deviceId}`);
-        if (alertCard) {
-          alertCard.classList.add("border-danger", "border-3");
-          setTimeout(
-            () => alertCard.classList.remove("border-danger", "border-3"),
-            5000,
-          );
-        }
-      });
-
-      socket.on("connect", () => {
-        logMessage("Conectado al servidor de WebSockets.");
-      });
-
-      socket.on("disconnect", (reason) => {
-        logMessage(`Desconectado del servidor: ${reason}.`);
-      });
-
-      socket.on("newSensorData", (data) => {
-        const { deviceId, sensorType, value, unit } = data;
-
-        if (!subscribedDevices.has(deviceId)) {
-          return;
-        }
-
-        const sensorList = document.getElementById(`sensors-list-${deviceId}`);
-        if (!sensorList) return;
-
-        let sensorItem = document.getElementById(
-          `sensor-${deviceId}-${sensorType}`,
-        );
-
-        if (!sensorItem) {
-          sensorItem = document.createElement("li");
-          sensorItem.className =
-            "list-group-item d-flex justify-content-between align-items-center";
-          sensorItem.id = `sensor-${deviceId}-${sensorType}`;
-
-          const icon = getSensorIcon(sensorType);
-          const sensorName = getSensorName(sensorType);
-
-          sensorItem.innerHTML = `
-            <span>
-                ${icon}
-                <strong class="ms-2">${sensorName}:</strong>
-            </span>
-            <span class="badge bg-primary rounded-pill fs-6" id="value-${deviceId}-${sensorType}">
-                ${value.toFixed(2)} ${unit}
-            </span>
-          `;
-          sensorList.appendChild(sensorItem);
-        } else {
-          const valueBadge = document.getElementById(
-            `value-${deviceId}-${sensorType}`,
-          );
-          if (valueBadge) {
-            valueBadge.textContent = `${value.toFixed(2)} ${unit}`;
-
-            valueBadge.classList.remove("bg-primary", "bg-success");
-            valueBadge.classList.add("bg-success");
-            setTimeout(() => {
-              valueBadge.classList.remove("bg-success");
-              valueBadge.classList.add("bg-primary");
-            }, 500);
+          if (data.event === "newSensorData") {
+            const sensorData = data.data;
+            const { deviceId, sensorType, value, unit } = sensorData;
+            updateSensorCard(deviceId, sensorType, value, unit);
+          } else if (data.event === "sensorAlert") {
+            const { deviceId, message } = data;
+            showNotification(`Alerta en ${deviceId}`, message);
+            logMessage(`🚨 ${message}`);
+          } else if (data.event === "ack") {
+            logMessage("📩 " + data.message);
+          } else if (data.event === "dataError") {
+            logMessage("⚠️ Error del servidor: " + data.message);
           }
+        } catch (err) {
+          console.error("Error procesando mensaje:", err, event.data);
         }
-      });
+      };
 
+      // --- SUSCRIPCIÓN A DISPOSITIVOS ---
       subscribeBtn.addEventListener("click", () => {
         const deviceId = deviceIdInput.value.trim();
-        if (!deviceId) {
-          alert("Por favor, introduce un ID de dispositivo.");
-          return;
-        }
-
-        if (deviceId !== "ESP32_1" && deviceId !== "ESP32_2") {
-          console.log(deviceId);
-          alert("Solo se permite ESP32_1 o ESP32_2");
-          return;
-        }
-
+        if (!deviceId) return alert("Introduce un ID de dispositivo.");
         if (subscribedDevices.has(deviceId)) {
-          logMessage(`Ya estás suscrito a ${deviceId}.`);
-          const existingCard = document.getElementById(`device-${deviceId}`);
-          if (existingCard) {
-            existingCard.classList.add("border-warning", "border-2");
-            setTimeout(
-              () => existingCard.classList.remove("border-warning", "border-2"),
-              1000,
-            );
-          }
+          logMessage(`Ya estás suscrito a ${deviceId}`);
           return;
         }
 
-        socket.emit("subscribeToDevice", deviceId);
-        logMessage(`Suscrito a los datos de: ${deviceId}`);
+        const msg = JSON.stringify({
+          event: "subscribeToDevice",
+          deviceId,
+        });
+        socket.send(msg);
+        logMessage(`Suscrito a: ${deviceId}`);
+
         createDeviceCard(deviceId);
         subscribedDevices.add(deviceId);
         deviceIdInput.value = "";
-        deviceIdInput.focus();
       });
 
-      deviceIdInput.addEventListener("keyup", function (event) {
-        if (event.key === "Enter") {
-          subscribeBtn.click();
-        }
+      deviceIdInput.addEventListener("keyup", (e) => {
+        if (e.key === "Enter") subscribeBtn.click();
       });
 
+      // --- CREACIÓN DE TARJETAS DE DISPOSITIVOS ---
       function createDeviceCard(deviceId) {
         if (document.getElementById(`device-${deviceId}`)) return;
 
         const card = document.createElement("div");
         card.className = "card mb-3 shadow-sm";
         card.id = `device-${deviceId}`;
-
         card.innerHTML = `
           <div class="card-header d-flex justify-content-between align-items-center">
-              <span>Dispositivo: <strong>${deviceId}</strong></span>
-              <button class="btn btn-sm btn-outline-danger" onclick="unsubscribe('${deviceId}')">
-                  <i class="bi bi-x-circle"></i> Dejar de seguir
-              </button>
+            <span>Dispositivo: <strong>${deviceId}</strong></span>
+            <button class="btn btn-sm btn-outline-danger" onclick="unsubscribe('${deviceId}')">
+              <i class="bi bi-x-circle"></i> Dejar de seguir
+            </button>
           </div>
           <div class="card-body">
-              <h5 class="card-title">Lecturas de Sensores</h5>
-              <ul class="list-group list-group-flush" id="sensors-list-${deviceId}">
-              </ul>
+            <h5 class="card-title">Lecturas de Sensores</h5>
+            <ul class="list-group list-group-flush" id="sensors-list-${deviceId}"></ul>
           </div>
         `;
         devicesContainer.appendChild(card);
@@ -257,39 +164,81 @@
 
       function unsubscribe(deviceId) {
         if (!subscribedDevices.has(deviceId)) return;
-
-        socket.emit("unsubscribeFromDevice", deviceId);
-        logMessage(`Desuscrito de los datos de: ${deviceId}`);
-
-        const card = document.getElementById(`device-${deviceId}`);
-        if (card) {
-          card.remove();
-        }
-
+        socket.send(
+          JSON.stringify({ event: "unsubscribeFromDevice", deviceId })
+        );
         subscribedDevices.delete(deviceId);
+        document.getElementById(`device-${deviceId}`)?.remove();
+        logMessage(`Desuscrito de ${deviceId}`);
       }
 
-      function getSensorName(sensorType) {
+      function updateSensorCard(deviceId, sensorType, value, unit) {
+        if (!subscribedDevices.has(deviceId)) return;
+
+        const sensorList = document.getElementById(`sensors-list-${deviceId}`);
+        if (!sensorList) return;
+
+        let sensorItem = document.getElementById(
+          `sensor-${deviceId}-${sensorType}`
+        );
+
+        if (!sensorItem) {
+          sensorItem = document.createElement("li");
+          sensorItem.className =
+            "list-group-item d-flex justify-content-between align-items-center";
+          sensorItem.id = `sensor-${deviceId}-${sensorType}`;
+          const icon = getSensorIcon(sensorType);
+          const name = getSensorName(sensorType);
+
+          sensorItem.innerHTML = `
+            <span>${icon} <strong class="ms-2">${name}:</strong></span>
+            <span class="badge bg-primary rounded-pill fs-6" id="value-${deviceId}-${sensorType}">
+              ${value.toFixed(2)} ${unit}
+            </span>`;
+          sensorList.appendChild(sensorItem);
+        } else {
+          const badge = document.getElementById(
+            `value-${deviceId}-${sensorType}`
+          );
+          badge.textContent = `${value.toFixed(2)} ${unit}`;
+          badge.classList.replace("bg-primary", "bg-success");
+          setTimeout(
+            () => badge.classList.replace("bg-success", "bg-primary"),
+            500
+          );
+        }
+      }
+
+      // --- NOTIFICACIONES ---
+      document.addEventListener("DOMContentLoaded", () => {
+        if ("Notification" in window && Notification.permission !== "granted") {
+          Notification.requestPermission();
+        }
+      });
+
+      function showNotification(title, body) {
+        if (Notification.permission === "granted") {
+          new Notification(title, { body });
+        }
+      }
+
+      // --- UTILS ---
+      function getSensorName(type) {
         const names = {
           temperature: "Temperatura",
           humidity: "Humedad",
-          air_quality: "Calidad del Aire",
-          hydrological_flow: "Caudal Hidrológico",
+          water_level: "Nivel de Agua",
         };
-        return (
-          names[sensorType] ||
-          sensorType.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())
-        );
+        return names[type] || type;
       }
 
-      function getSensorIcon(sensorType) {
+      function getSensorIcon(type) {
         const icons = {
           temperature: '<i class="bi bi-thermometer-half text-danger"></i>',
           humidity: '<i class="bi bi-droplet-half text-info"></i>',
-          air_quality: '<i class="bi bi-wind text-secondary"></i>',
-          hydrological_flow: '<i class="bi bi-water text-primary"></i>',
+          water_level: '<i class="bi bi-water text-primary"></i>',
         };
-        return icons[sensorType] || '<i class="bi bi-cpu text-muted"></i>';
+        return icons[type] || '<i class="bi bi-cpu text-muted"></i>';
       }
 
       function logMessage(message) {
