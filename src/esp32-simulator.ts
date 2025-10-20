@@ -3,7 +3,8 @@ import WebSocket from "ws";
 import { SensorPayload } from "./interfaces/sensor-payload";
 
 const SIMULATION_INTERVAL_MS = 1000;
-const SERVER_URL = `${process.env.BACKEND_URL}`;
+const RAW = process.env.BACKEND_URL!; // p.ej. "https://monitoring-system-opbd.onrender.com"
+const SERVER_URL = RAW.replace(/^http/, "ws").replace(/\/?$/, "/"); // -> wss://.../ o ws://.../
 
 if (!process.env.BACKEND_URL) {
   console.error("❌ La variable BACKEND_URL no está definida");
@@ -15,12 +16,12 @@ const deviceConfig = {
     sensors: (): Omit<SensorPayload, "deviceId">[] => [
       {
         sensorType: "temperature",
-        value: +(Math.random() * 40 + 10).toFixed(2), // Temperatura entre 10 y 50 °C
+        value: +(Math.random() * 40 + 10).toFixed(2),
         unit: "°C",
       },
       {
         sensorType: "humidity",
-        value: +(Math.random() * 40 + 60).toFixed(2), // Humedad entre 60 y 100%
+        value: +(Math.random() * 40 + 60).toFixed(2),
         unit: "%",
       },
     ],
@@ -29,7 +30,7 @@ const deviceConfig = {
     sensors: (): Omit<SensorPayload, "deviceId">[] => [
       {
         sensorType: "water_level",
-        value: +(Math.random() * 100).toFixed(2), // Nivel entre 0 y 100%
+        value: +(Math.random() * 100).toFixed(2),
         unit: "%",
       },
     ],
@@ -39,37 +40,43 @@ const deviceConfig = {
 type DeviceId = keyof typeof deviceConfig;
 
 function createDeviceSimulator(deviceId: DeviceId) {
-  const ws = new WebSocket(SERVER_URL.replace(/^http/, "ws"));
+  let ws = new WebSocket(SERVER_URL);
+  let timer: NodeJS.Timeout;
+
+  const startSender = () => {
+    timer = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        const readings = deviceConfig[deviceId]
+          .sensors()
+          .map((s) => ({ ...s, deviceId }));
+        ws.send(JSON.stringify(readings));
+        console.log(`[${deviceId}] 📤 Enviando datos:`, readings);
+      }
+    }, SIMULATION_INTERVAL_MS);
+  };
 
   ws.on("open", () => {
-    console.log(`[${deviceId}] ✅ Conectado al servidor WebSocket`);
+    console.log(`[${deviceId}] ✅ Conectado a ${SERVER_URL}`);
     ws.send(JSON.stringify({ event: "registerDevice", deviceId }));
+    startSender();
   });
 
   ws.on("message", (msg) => {
-    console.log(`[${deviceId}] Mensaje recibido:`, msg.toString());
+    console.log(`[${deviceId}] ←`, msg.toString());
   });
 
   ws.on("close", () => {
-    console.log(`[${deviceId}] 🔌 Desconectado del servidor`);
+    console.log(`[${deviceId}] 🔌 Desconectado`);
+    clearInterval(timer);
+    // Reconexión simple
+    setTimeout(() => createDeviceSimulator(deviceId), 3000);
   });
 
   ws.on("error", (err) => {
-    console.error(`[${deviceId}] ❌ Error de conexión:`, err.message);
+    console.error(`[${deviceId}] ❌ Error:`, err.message);
   });
-
-  setInterval(() => {
-    if (ws.readyState === WebSocket.OPEN) {
-      const readings = deviceConfig[deviceId]
-        .sensors()
-        .map((s) => ({ ...s, deviceId }));
-      ws.send(JSON.stringify(readings));
-      console.log(`[${deviceId}] 📤 Enviando datos:`, readings);
-    }
-  }, SIMULATION_INTERVAL_MS);
 }
 
-// Lanzar simuladores
 for (const id of Object.keys(deviceConfig) as DeviceId[]) {
   createDeviceSimulator(id);
 }
