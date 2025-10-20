@@ -1,3 +1,4 @@
+// app.ts
 import path from "node:path";
 import express from "express";
 import connectDB from "./config/database";
@@ -11,15 +12,21 @@ connectDB();
 
 const app = express();
 
-const corsOptions: CorsOptions = {
-  origin: true, // Permite todas las solicitudes desde cualquier origen
-  credentials: true, // Habilita el envío de cookies y encabezados de autorización
-};
+// Si la app está detrás de un proxy (p.ej. Heroku, AWS ELB, Nginx), habilitar trust proxy
+app.set("trust proxy", true);
 
+const corsOptions: CorsOptions = {
+  origin: true, // Permite todos los orígenes
+  credentials: true, // Cookies / Authorization headers
+};
 app.use(cors(corsOptions));
 
 app.use(express.json());
 app.use(cookieParser());
+
+app.get("/health", (_req, res) => {
+  res.status(200).json({ ok: true });
+});
 
 const openApiDir = path.resolve(__dirname, "..");
 

@@ -78,7 +78,7 @@
       const devicesContainer = document.getElementById("devices-container");
       const subscribedDevices = new Set();
 
-      const WS_URL = "wss://monitoring-system-opbd.onrender.com";
+      const WS_URL = "wss://monitoring-system-opbd.onrender.com/";
       const socket = new WebSocket(WS_URL);
 
       socket.onopen = () => {
