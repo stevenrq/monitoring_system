@@ -1,4 +1,3 @@
-// app.ts
 import path from "node:path";
 import express from "express";
 import connectDB from "./config/database";

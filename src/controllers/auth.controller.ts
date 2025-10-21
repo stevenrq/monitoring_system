@@ -74,7 +74,7 @@ export const handleForgotPassword = async (req: Request, res: Response) => {
 
 export const handleChangePassword = async (
   req: RequestWithUser,
-  res: Response,
+  res: Response
 ) => {
   try {
     if (!req.user) {
@@ -102,7 +102,7 @@ export const handleChangePassword = async (
 
 export const getAuthenticatedUser = async (
   req: RequestWithUser,
-  res: Response,
+  res: Response
 ) => {
   try {
     if (!req.user?.userId) {
