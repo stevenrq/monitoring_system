@@ -42,7 +42,7 @@ async function createAdmin(): Promise<void> {
 
     if (existingAdmin) {
       console.log(
-        `\nEl usuario administrador con el correo electrónico '${email}' o el nombre de usuario '${username}' ya existe.`,
+        `\nEl usuario administrador con el correo electrónico '${email}' o el nombre de usuario '${username}' ya existe.`
       );
       return;
     }
