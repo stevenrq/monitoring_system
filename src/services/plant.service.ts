@@ -1,8 +1,13 @@
-import { IPlantDocument } from "../interfaces/plant.interface";
+import {
+  IPlant,
+  IPlantDocument,
+  PlantUpdatePayload,
+} from "../interfaces/plant.interface";
+import { SENSOR_TYPES } from "../constants/sensor-types";
 import Plant from "../models/plant.model";
 
 export const createPlant = async (
-  plantData: Required<IPlantDocument>
+  plantData: IPlant
 ): Promise<IPlantDocument> => {
   const newPlant = new Plant(plantData);
   return await newPlant.save();
@@ -20,12 +25,30 @@ export const getPlantById = async (
 
 export const updatePlant = async (
   plantId: string,
-  updateData: Partial<IPlantDocument>
+  updateData: PlantUpdatePayload
 ): Promise<IPlantDocument | null> => {
-  return Plant.findByIdAndUpdate(plantId, updateData, {
-    new: true,
-    runValidators: true,
-  });
+  const plant = await Plant.findById(plantId);
+  if (!plant) {
+    return null;
+  }
+
+  if (updateData.name !== undefined) {
+    plant.name = updateData.name;
+  }
+
+  if (updateData.thresholds) {
+    for (const sensor of SENSOR_TYPES) {
+      const sensorUpdate = updateData.thresholds[sensor];
+      if (sensorUpdate) {
+        plant.thresholds[sensor] = {
+          ...plant.thresholds[sensor],
+          ...sensorUpdate,
+        };
+      }
+    }
+  }
+
+  return plant.save();
 };
 
 export const deletePlant = async (

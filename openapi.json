@@ -1409,14 +1409,69 @@
           }
         }
       },
+      "UmbralSensor": {
+        "type": "object",
+        "properties": {
+          "min": {
+            "type": "number",
+            "nullable": true,
+            "description": "Valor mínimo permitido para el sensor."
+          },
+          "max": {
+            "type": "number",
+            "nullable": true,
+            "description": "Valor máximo permitido para el sensor."
+          }
+        },
+        "example": {
+          "min": 18,
+          "max": 28
+        },
+        "additionalProperties": false
+      },
       "PlantaBase": {
         "type": "object",
-        "required": ["name"],
+        "required": ["name", "thresholds"],
         "properties": {
           "name": {
             "type": "string",
             "example": "Helecho de Boston",
             "description": "Nombre de la planta."
+          },
+          "thresholds": {
+            "type": "object",
+            "description": "Umbrales por tipo de sensor que aplican a la planta.",
+            "required": [
+              "temperature",
+              "humidity",
+              "soil_humidity",
+              "solar_radiation"
+            ],
+            "properties": {
+              "temperature": {
+                "$ref": "#/components/schemas/UmbralSensor",
+                "description": "Umbrales para la temperatura (°C)."
+              },
+              "humidity": {
+                "$ref": "#/components/schemas/UmbralSensor",
+                "description": "Umbrales para la humedad relativa (%)."
+              },
+              "soil_humidity": {
+                "$ref": "#/components/schemas/UmbralSensor",
+                "description": "Umbrales para la humedad del suelo (%)."
+              },
+              "solar_radiation": {
+                "$ref": "#/components/schemas/UmbralSensor",
+                "description": "Umbrales para la radiación solar (W/m²). El valor mínimo es opcional."
+              }
+            },
+            "additionalProperties": false,
+            "example": {
+              "temperature": { "min": 18, "max": 28 },
+              "humidity": { "min": 40, "max": 75 },
+              "soil_humidity": { "min": 30, "max": 60 },
+              "solar_radiation": { "max": 950 }
+            }
           }
         }
       },
@@ -1442,7 +1497,19 @@
               }
             }
           }
-        ]
+        ],
+        "example": {
+          "_id": "64f0c3413f0c4d0021a4b580",
+          "name": "Tomate Cherry",
+          "thresholds": {
+            "temperature": { "min": 18, "max": 30 },
+            "humidity": { "min": 45, "max": 80 },
+            "soil_humidity": { "min": 35, "max": 70 },
+            "solar_radiation": { "max": 900 }
+          },
+          "createdAt": "2024-05-21T15:12:30.123Z",
+          "updatedAt": "2024-05-21T15:12:30.123Z"
+        }
       },
       "LecturaSensor": {
         "type": "object",
