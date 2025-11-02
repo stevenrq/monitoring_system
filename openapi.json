@@ -1411,22 +1411,12 @@
       },
       "PlantaBase": {
         "type": "object",
-        "required": ["name", "description", "quantity"],
+        "required": ["name"],
         "properties": {
           "name": {
             "type": "string",
             "example": "Helecho de Boston",
             "description": "Nombre de la planta."
-          },
-          "description": {
-            "type": "string",
-            "example": "Planta ideal para interiores con sombra.",
-            "description": "Descripción general de la planta."
-          },
-          "quantity": {
-            "type": "integer",
-            "example": 15,
-            "description": "Cantidad de ejemplares registrados."
           }
         }
       },
