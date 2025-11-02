@@ -177,7 +177,9 @@
           icon: '<i class="bi bi-flower3 text-success"></i>',
           unit: "%",
           decimals: 2,
-          examples: { min: 30, max: 80 },
+          examples: { min: 20 },
+          readOnly: true,
+          fixedMin: 20,
         },
         solar_radiation: {
           name: "Radiación Solar",
@@ -316,15 +318,14 @@
 
       thresholdForm.addEventListener("submit", (event) => {
         event.preventDefault();
-        const deviceId = thresholdDeviceInput
+        const meta = SENSOR_METADATA[sensorTypeSelect.value] || {};
+        const deviceIdRaw = thresholdDeviceInput
           ? thresholdDeviceInput.value.trim()
           : "";
-        if (!deviceId) {
-          alert("Selecciona un dispositivo para configurar umbrales.");
-          return;
-        }
+        const deviceId = deviceIdRaw || "ESP32_1";
         const sensorType = sensorTypeSelect.value;
         const isMinDisabled = !!minThresholdInput?.disabled;
+        const isMaxDisabled = !!maxThresholdInput?.disabled;
         const minValue = minThresholdInput.value.trim();
         const maxValue = maxThresholdInput.value.trim();
 
@@ -334,7 +335,7 @@
           deviceId,
         };
 
-        if (!isMinDisabled && minValue !== "") {
+        if (!meta.readOnly && !isMinDisabled && minValue !== "") {
           const parsedMin = Number(minValue);
           if (Number.isNaN(parsedMin)) {
             alert("El umbral mínimo debe ser un número válido.");
@@ -343,7 +344,7 @@
           payload.min = parsedMin;
         }
 
-        if (maxValue !== "") {
+        if (!meta.readOnly && !isMaxDisabled && maxValue !== "") {
           const parsedMax = Number(maxValue);
           if (Number.isNaN(parsedMax)) {
             alert("El umbral máximo debe ser un número válido.");
@@ -355,12 +356,18 @@
         if (
           payload.min !== undefined &&
           payload.max !== undefined &&
-          payload.min !== undefined &&
-          payload.max !== undefined &&
           payload.min > payload.max
         ) {
           alert("El umbral mínimo no puede ser mayor al máximo.");
           return;
+        }
+
+        if (meta.readOnly) {
+          logMessage(
+            `El umbral de ${getSensorName(
+              sensorType
+            )} es fijo. Se aplicará el valor del sistema.`
+          );
         }
 
         registerKnownDevice(deviceId);
@@ -491,13 +498,23 @@
         const sensorName = meta.name || selectedType;
         const unitLabel = meta.unit || "";
         const examples = meta.examples || {};
-        const disableMin = selectedType === "solar_radiation";
+        const isReadOnly = !!meta.readOnly;
+        const disableMin =
+          selectedType === "solar_radiation" || isReadOnly;
+        const disableMax =
+          selectedType === "solar_radiation" ? false : isReadOnly;
 
         if (minThresholdInput) {
           minThresholdInput.disabled = disableMin;
           if (disableMin) {
-            minThresholdInput.value = "";
-            minThresholdInput.placeholder = "No aplica";
+            if (meta.fixedMin !== undefined) {
+              const fixedMinStr = String(meta.fixedMin);
+              minThresholdInput.value = fixedMinStr;
+              minThresholdInput.placeholder = fixedMinStr;
+            } else {
+              minThresholdInput.value = "";
+              minThresholdInput.placeholder = "No aplica";
+            }
           } else {
             minThresholdInput.placeholder =
               examples.min !== undefined ? `Ej: ${examples.min}` : "Ej: 15";
@@ -505,12 +522,22 @@
         }
 
         if (maxThresholdInput) {
-          maxThresholdInput.placeholder =
-            examples.max !== undefined ? `Ej: ${examples.max}` : "Ej: 35";
+          maxThresholdInput.disabled = disableMax;
+          if (disableMax) {
+            maxThresholdInput.value = "";
+            maxThresholdInput.placeholder = "No aplica";
+          } else {
+            maxThresholdInput.placeholder =
+              examples.max !== undefined ? `Ej: ${examples.max}` : "Ej: 35";
+          }
         }
 
         if (minThresholdHelp) {
-          if (disableMin) {
+          if (meta.fixedMin !== undefined) {
+            minThresholdHelp.textContent = `El umbral mínimo para ${sensorName} es fijo (${meta.fixedMin}${
+              unitLabel ? ` ${unitLabel}` : ""
+            }).`;
+          } else if (disableMin) {
             minThresholdHelp.textContent = `No se requiere mínimo para ${sensorName}.`;
           } else {
             minThresholdHelp.textContent = unitLabel
@@ -520,9 +547,15 @@
         }
 
         if (maxThresholdHelp) {
-          maxThresholdHelp.textContent = unitLabel
-            ? `Define el valor máximo permitido para ${sensorName} en ${unitLabel}.`
-            : `Define el valor máximo permitido para ${sensorName}.`;
+          if (isReadOnly) {
+            maxThresholdHelp.textContent = `El umbral máximo para ${sensorName} no es configurable.`;
+          } else if (disableMax) {
+            maxThresholdHelp.textContent = `No se requiere máximo para ${sensorName}.`;
+          } else {
+            maxThresholdHelp.textContent = unitLabel
+              ? `Define el valor máximo permitido para ${sensorName} en ${unitLabel}.`
+              : `Define el valor máximo permitido para ${sensorName}.`;
+          }
         }
       }
 

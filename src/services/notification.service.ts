@@ -23,6 +23,8 @@ const ALERT_COOLDOWN_MS = 60000;
  */
 const alertThresholds: Record<string, Record<string, Threshold>> = {};
 
+export const ALERT_ENABLED_DEVICE_IDS = new Set<string>(["ESP32_1"]);
+
 /**
  * Actualiza los umbrales permitidos para un tipo de sensor.
  */
@@ -45,6 +47,10 @@ export function setAlertThreshold(
     );
   }
 
+  if (!ALERT_ENABLED_DEVICE_IDS.has(normalizedDeviceId)) {
+    return undefined;
+  }
+
   if (thresholds.min !== undefined && !Number.isNaN(thresholds.min)) {
     sanitized.min = thresholds.min;
   }
@@ -55,6 +61,14 @@ export function setAlertThreshold(
 
   if (normalizedSensorType === "solar_radiation") {
     delete sanitized.min;
+  }
+
+  if (
+    normalizedDeviceId === "ESP32_1" &&
+    normalizedSensorType === "soil_humidity"
+  ) {
+    sanitized.min = 20;
+    delete sanitized.max;
   }
 
   if (
@@ -105,6 +119,11 @@ export const checkSensorDataForAlerts = (
   sensorData: SensorPayload
 ) => {
   const { deviceId, sensorType, value, unit } = sensorData;
+
+  if (!ALERT_ENABLED_DEVICE_IDS.has(deviceId)) {
+    return;
+  }
+
   const thresholds = getAlertThreshold(deviceId, sensorType);
   if (!thresholds) return;
 

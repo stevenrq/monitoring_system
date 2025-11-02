@@ -20,14 +20,21 @@ const SensorThresholdSchema = new Schema<SensorThreshold>(
 
 const thresholdsDefinition: Record<string, unknown> = {};
 for (const sensor of SENSOR_TYPES) {
-  thresholdsDefinition[sensor] = {
+  const definition: Record<string, unknown> = {
     type: SensorThresholdSchema,
     required: true,
   };
+
+  if (sensor === "soil_humidity") {
+    definition.default = { min: 20 };
+  }
+
+  thresholdsDefinition[sensor] = definition;
 }
 
 export const PlantSchema = new Schema<IPlantDocument, IPlantModel>(
   {
+    deviceId: { type: String, trim: true, default: "ESP32_1" },
     name: { type: String, required: true, trim: true },
     thresholds: {
       type: new Schema<PlantThresholds>(thresholdsDefinition, { _id: false }),

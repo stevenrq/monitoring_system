@@ -1458,7 +1458,7 @@
               },
               "soil_humidity": {
                 "$ref": "#/components/schemas/UmbralSensor",
-                "description": "Umbrales para la humedad del suelo (%)."
+                "description": "Umbrales para la humedad del suelo (%). El sistema fija automáticamente el mínimo en 20% y no admite máximo."
               },
               "solar_radiation": {
                 "$ref": "#/components/schemas/UmbralSensor",
@@ -1469,7 +1469,7 @@
             "example": {
               "temperature": { "min": 18, "max": 28 },
               "humidity": { "min": 40, "max": 75 },
-              "soil_humidity": { "min": 30, "max": 60 },
+              "soil_humidity": { "min": 20 },
               "solar_radiation": { "max": 950 }
             }
           }
@@ -1500,11 +1500,12 @@
         ],
         "example": {
           "_id": "64f0c3413f0c4d0021a4b580",
+          "deviceId": "ESP32_1",
           "name": "Tomate Cherry",
           "thresholds": {
             "temperature": { "min": 18, "max": 30 },
             "humidity": { "min": 45, "max": 80 },
-            "soil_humidity": { "min": 35, "max": 70 },
+            "soil_humidity": { "min": 20 },
             "solar_radiation": { "max": 900 }
           },
           "createdAt": "2024-05-21T15:12:30.123Z",

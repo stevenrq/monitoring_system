@@ -11,6 +11,7 @@ export type PlantThresholds = Record<SensorType, SensorThreshold>;
 export interface IPlant {
   name: string;
   thresholds: PlantThresholds;
+  deviceId?: string;
 }
 
 export type PlantThresholdsUpdate = Partial<
