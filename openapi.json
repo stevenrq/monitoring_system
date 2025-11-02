@@ -1011,8 +1011,8 @@
     "/api/sensor-data/latest": {
       "get": {
         "tags": ["Sensores"],
-        "summary": "Obtiene la última lectura de cada sensor",
-        "description": "Devuelve la lectura más reciente por combinación de dispositivo y tipo de sensor. Opcionalmente se puede filtrar por un dispositivo específico.",
+        "summary": "Obtiene la última lectura de cada combinación dispositivo + tipo de sensor",
+        "description": "Devuelve la lectura más reciente registrada para cada sensor. Si no se especifica `deviceId`, se devuelven todas las últimas lecturas agrupadas por sensor y dispositivo.",
         "parameters": [
           {
             "in": "query",
@@ -1021,7 +1021,8 @@
             "schema": {
               "type": "string"
             },
-            "description": "ID del dispositivo para filtrar las lecturas."
+            "description": "ID del dispositivo a filtrar. Si no se envía, se muestran todos los dispositivos.",
+            "example": "ESP32_01"
           }
         ],
         "responses": {
@@ -1034,16 +1035,33 @@
                   "items": {
                     "$ref": "#/components/schemas/LecturaSensor"
                   }
-                }
+                },
+                "example": [
+                  {
+                    "deviceId": "ESP32_01",
+                    "sensorType": "temperature",
+                    "value": 26.4,
+                    "unit": "°C",
+                    "timestamp": "2025-11-02T10:15:32.000Z"
+                  },
+                  {
+                    "deviceId": "ESP32_01",
+                    "sensorType": "humidity",
+                    "value": 61.8,
+                    "unit": "%",
+                    "timestamp": "2025-11-02T10:15:31.000Z"
+                  }
+                ]
               }
             }
           },
           "400": {
-            "description": "Parámetros inválidos.",
+            "description": "Parámetro inválido (por ejemplo, formato incorrecto).",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
+                "schema": { "$ref": "#/components/schemas/ErrorRespuesta" },
+                "example": {
+                  "error": "El parámetro 'deviceId' no es válido."
                 }
               }
             }
@@ -1054,46 +1072,44 @@
     "/api/sensor-data/report": {
       "get": {
         "tags": ["Sensores"],
-        "summary": "Genera un reporte estadístico de sensores",
-        "description": "Calcula valores mínimos, máximos y promedio por sensor. Se puede filtrar por dispositivo, tipo de sensor y rango de fechas.",
+        "summary": "Genera un reporte estadístico por sensor",
+        "description": "Calcula estadísticas por cada combinación dispositivo + tipo de sensor. Soporta filtros por tipo, dispositivo y rango de fechas.",
         "parameters": [
           {
             "in": "query",
             "name": "deviceId",
+            "schema": { "type": "string" },
             "required": false,
-            "schema": {
-              "type": "string"
-            },
-            "description": "ID del dispositivo a filtrar."
+            "description": "Filtra solo por un dispositivo específico.",
+            "example": "ESP32_02"
           },
           {
             "in": "query",
             "name": "sensorType",
+            "schema": { "type": "string" },
             "required": false,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Tipo de sensor (por ejemplo, temperatura, humedad)."
+            "description": "Filtra por tipo de sensor.",
+            "example": "humidity"
           },
           {
             "in": "query",
             "name": "from",
-            "required": false,
             "schema": {
               "type": "string",
               "format": "date-time"
             },
-            "description": "Fecha inicial del rango en formato ISO 8601."
+            "description": "Fecha inicial del rango (incluyente). Debe ser un ISO string.",
+            "example": "2025-11-01T00:00:00.000Z"
           },
           {
             "in": "query",
             "name": "to",
-            "required": false,
             "schema": {
               "type": "string",
               "format": "date-time"
             },
-            "description": "Fecha final del rango en formato ISO 8601."
+            "description": "Fecha final del rango (incluyente).",
+            "example": "2025-11-02T23:59:59.000Z"
           }
         ],
         "responses": {
@@ -1103,19 +1119,32 @@
               "application/json": {
                 "schema": {
                   "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ReporteSensor"
+                  "items": { "$ref": "#/components/schemas/ReporteSensor" }
+                },
+                "example": [
+                  {
+                    "deviceId": "ESP32_01",
+                    "sensorType": "temperature",
+                    "unit": "°C",
+                    "samples": 280,
+                    "minValue": 22.1,
+                    "maxValue": 32.8,
+                    "averageValue": 26.9,
+                    "firstTimestamp": "2025-11-01T10:00:00.000Z",
+                    "lastTimestamp": "2025-11-02T14:30:00.000Z",
+                    "latestValue": 27.3
                   }
-                }
+                ]
               }
             }
           },
           "400": {
-            "description": "Parámetros inválidos.",
+            "description": "Formato de fecha inválido o parámetros incorrectos.",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
+                "schema": { "$ref": "#/components/schemas/ErrorRespuesta" },
+                "example": {
+                  "error": "El formato de fecha es inválido. Usa un ISO string válido."
                 }
               }
             }
@@ -1126,55 +1155,58 @@
     "/api/sensor-data/raw": {
       "get": {
         "tags": ["Sensores"],
-        "summary": "Obtiene los datos crudos de sensores",
-        "description": "Devuelve lecturas individuales sin agregaciones. Permite limitar el número de resultados y filtrar por dispositivo, tipo de sensor y rango de fechas.",
+        "summary": "Obtiene lecturas individuales sin agregación",
+        "description": "Devuelve los documentos originales almacenados en la base de datos. Permite filtrar por dispositivo, tipo, rango de fechas y limitar el número de resultados. Los resultados se ordenan por `timestamp` DESC.",
         "parameters": [
           {
             "in": "query",
             "name": "deviceId",
+            "schema": { "type": "string" },
             "required": false,
-            "schema": {
-              "type": "string"
-            },
-            "description": "ID del dispositivo para filtrar resultados."
+            "description": "Filtra por dispositivo.",
+            "example": "ESP32_01"
           },
           {
             "in": "query",
             "name": "sensorType",
+            "schema": { "type": "string" },
             "required": false,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Tipo de sensor (por ejemplo, temperatura, humedad)."
+            "description": "Filtra por tipo de sensor.",
+            "example": "temperature"
           },
           {
             "in": "query",
             "name": "from",
-            "required": false,
             "schema": {
               "type": "string",
               "format": "date-time"
             },
-            "description": "Fecha inicial del rango en formato ISO 8601."
+            "required": false,
+            "description": "Fecha inicial del rango (incluyente).",
+            "example": "2025-11-02T10:00:00.000Z"
           },
           {
             "in": "query",
             "name": "to",
-            "required": false,
             "schema": {
               "type": "string",
               "format": "date-time"
             },
-            "description": "Fecha final del rango en formato ISO 8601."
+            "required": false,
+            "description": "Fecha final del rango (incluyente).",
+            "example": "2025-11-02T14:00:00.000Z"
           },
           {
             "in": "query",
             "name": "limit",
-            "required": false,
             "schema": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": 1,
+              "default": 100
             },
-            "description": "Número máximo de registros a devolver. Por defecto 100."
+            "required": false,
+            "description": "Número máximo de registros a devolver. Si no se envía, se usan 100.",
+            "example": 50
           }
         ],
         "responses": {
@@ -1184,10 +1216,26 @@
               "application/json": {
                 "schema": {
                   "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/DatoSensorCrudo"
+                  "items": { "$ref": "#/components/schemas/DatoSensorCrudo" }
+                },
+                "example": [
+                  {
+                    "_id": "672646217d3d56b6e8c4e130",
+                    "deviceId": "ESP32_01",
+                    "sensorType": "temperature",
+                    "value": 27.21,
+                    "unit": "°C",
+                    "timestamp": "2025-11-02T14:30:15.543Z"
+                  },
+                  {
+                    "_id": "672646217d3d56b6e8c4e131",
+                    "deviceId": "ESP32_01",
+                    "sensorType": "temperature",
+                    "value": 27.19,
+                    "unit": "°C",
+                    "timestamp": "2025-11-02T14:29:15.543Z"
                   }
-                }
+                ]
               }
             }
           },
@@ -1195,8 +1243,9 @@
             "description": "Parámetros inválidos.",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
+                "schema": { "$ref": "#/components/schemas/ErrorRespuesta" },
+                "example": {
+                  "error": "El parámetro 'limit' debe ser un número entero positivo."
                 }
               }
             }
