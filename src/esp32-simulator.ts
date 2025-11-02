@@ -2,7 +2,7 @@ import "./config/index";
 import WebSocket from "ws";
 import { SensorPayload } from "./interfaces/sensor-payload";
 
-const SIMULATION_INTERVAL_MS = 1000;
+const SIMULATION_INTERVAL_MS = 5000; // 5 segundos
 const RAW = process.env.BACKEND_URL!; // p.ej. "https://monitoring-system-opbd.onrender.com"
 const SERVER_URL = RAW.replace(/^http/, "ws").replace(/\/?$/, "/"); // -> wss://.../ o ws://.../
 
@@ -11,27 +11,54 @@ if (!process.env.BACKEND_URL) {
   process.exit(1);
 }
 
+// Función para simular un sensor DHT11 (temperatura + humedad)
+function simulateDHT11(): Omit<SensorPayload, "deviceId">[] {
+  return [
+    {
+      sensorType: "temperature",
+      value: +(Math.random() * 40 + 10).toFixed(2), // entre 10°C y 50°C
+      unit: "°C",
+    },
+    {
+      sensorType: "humidity",
+      value: +(Math.random() * 40 + 60).toFixed(2), // entre 60% y 100%
+      unit: "%",
+    },
+  ];
+}
+
+// Configuración de dispositivos y sensores
 const deviceConfig = {
+  // Interior del Umbráculo
   ESP32_1: {
     sensors: (): Omit<SensorPayload, "deviceId">[] => [
+      ...simulateDHT11(),
+      ...simulateDHT11(),
+      ...simulateDHT11(),
+
       {
-        sensorType: "temperature",
-        value: +(Math.random() * 40 + 10).toFixed(2),
-        unit: "°C",
+        sensorType: "solar_radiation",
+        value: +(Math.random() * 1200).toFixed(2), // W/m2 típico de 0 a 1200
+        unit: "W/m2",
       },
       {
-        sensorType: "humidity",
-        value: +(Math.random() * 40 + 60).toFixed(2),
+        sensorType: "soil_humidity",
+        value: +(Math.random() * 100).toFixed(2), // entre 0% y 100%
         unit: "%",
       },
     ],
   },
+  // Exterior del Umbráculo
   ESP32_2: {
     sensors: (): Omit<SensorPayload, "deviceId">[] => [
+      ...simulateDHT11(),
+      ...simulateDHT11(),
+      ...simulateDHT11(),
+
       {
-        sensorType: "water_level",
-        value: +(Math.random() * 100).toFixed(2),
-        unit: "%",
+        sensorType: "solar_radiation",
+        value: +(Math.random() * 1200).toFixed(2),
+        unit: "W/m2",
       },
     ],
   },
@@ -68,7 +95,6 @@ function createDeviceSimulator(deviceId: DeviceId) {
   ws.on("close", () => {
     console.log(`[${deviceId}] 🔌 Desconectado`);
     clearInterval(timer);
-    // Reconexión simple
     setTimeout(() => createDeviceSimulator(deviceId), 3000);
   });
 
@@ -77,6 +103,7 @@ function createDeviceSimulator(deviceId: DeviceId) {
   });
 }
 
+// Iniciar simulación por cada ESP32 registrada
 for (const id of Object.keys(deviceConfig) as DeviceId[]) {
   createDeviceSimulator(id);
 }
