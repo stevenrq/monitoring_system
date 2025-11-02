@@ -12,7 +12,7 @@ router.get(
   "/count",
   protect,
   authorize("admin"),
-  plantController.getPlantCount,
+  plantController.getPlantCount
 );
 
 router.get("/:id", protect, authorize("admin"), plantController.getPlantById);

@@ -47,7 +47,7 @@ export interface SensorReportEntry {
  * @returns Promesa con una lista de lecturas más recientes.
  */
 export const getLatestSensorReadings = async (
-  deviceId?: string,
+  deviceId?: string
 ): Promise<LatestSensorReading[]> => {
   const matchStage: Record<string, unknown> = {};
 
@@ -93,7 +93,7 @@ export const getLatestSensorReadings = async (
  * @returns Promesa con un arreglo de reportes agregados.
  */
 export const getSensorReport = async (
-  filters: SensorReportFilters,
+  filters: SensorReportFilters
 ): Promise<SensorReportEntry[]> => {
   const matchStage: Record<string, unknown> = {};
 
@@ -164,7 +164,7 @@ const DEFAULT_RAW_DATA_LIMIT = 100;
  * @returns Promesa con una lista de documentos de datos de sensores.
  */
 export const getRawSensorData = async (
-  filters: SensorReportFilters,
+  filters: SensorReportFilters
 ): Promise<ISensorDataDocument[]> => {
   const query: Record<string, unknown> = {};
 

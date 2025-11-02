@@ -20,7 +20,7 @@ const parseDate = (value: unknown): Date | undefined => {
 
   if (Number.isNaN(date.getTime())) {
     throw new Error(
-      "El formato de fecha es inválido. Usa un ISO string válido.",
+      "El formato de fecha es inválido. Usa un ISO string válido."
     );
   }
 
@@ -68,7 +68,7 @@ export const latestSensorReadings = async (req: Request, res: Response) => {
   try {
     const { deviceId } = req.query;
     const readings = await getLatestSensorReadings(
-      deviceId ? String(deviceId) : undefined,
+      deviceId ? String(deviceId) : undefined
     );
     res.status(200).json(readings);
   } catch (error) {

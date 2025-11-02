@@ -13,7 +13,7 @@ export interface RequestWithUser extends Request {
 export const protect = (
   req: RequestWithUser,
   res: Response,
-  next: NextFunction,
+  next: NextFunction
 ) => {
   let accessToken: string | undefined;
 
@@ -23,7 +23,7 @@ export const protect = (
 
       req.user = jwt.verify(
         accessToken,
-        process.env.ACCESS_TOKEN_SECRET as string,
+        process.env.ACCESS_TOKEN_SECRET as string
       ) as JwtCustomPayload;
 
       return next();

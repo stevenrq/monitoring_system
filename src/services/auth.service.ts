@@ -17,13 +17,13 @@ const REFRESH_TOKEN_EXPIRES_IN = (process.env.REFRESH_TOKEN_EXPIRES_IN ||
 
 if (!ACCESS_TOKEN_SECRET || !REFRESH_TOKEN_SECRET) {
   console.error(
-    "Error fatal: Las variables de entorno para los tokens JWT no están definidas.",
+    "Error fatal: Las variables de entorno para los tokens JWT no están definidas."
   );
   process.exit(1);
 }
 
 const generateTokens = async (
-  user: IUserDocument,
+  user: IUserDocument
 ): Promise<{ accessToken: string; refreshToken: string }> => {
   const payload: JwtCustomPayload = {
     userId: user._id as string,
@@ -74,7 +74,7 @@ export const createAdmin = async (req: Request): Promise<IUserDocument> => {
 };
 
 export const login = async (
-  req: Request,
+  req: Request
 ): Promise<{ accessToken: string; refreshToken: string }> => {
   const { username, password } = req.body;
 
@@ -98,7 +98,7 @@ export const login = async (
 };
 
 export const refreshToken = async (
-  oldRefreshToken: string,
+  oldRefreshToken: string
 ): Promise<{ accessToken: string; refreshToken: string }> => {
   try {
     const decoded = jwt.verify(oldRefreshToken, REFRESH_TOKEN_SECRET) as {
@@ -170,7 +170,7 @@ export const forgotPassword = async (email: string): Promise<void> => {
 export const changePassword = async (
   userId: string,
   oldPassword: string,
-  newPassword: string,
+  newPassword: string
 ): Promise<void> => {
   const user = await User.findById(userId).select("+password +refreshToken");
   if (!user) {

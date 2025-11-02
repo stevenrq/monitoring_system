@@ -11,7 +11,7 @@ interface EmailOptions {
 
 if (!process.env.SENDGRID_API_KEY) {
   console.error(
-    "Error fatal: La variable de entorno SENDGRID_API_KEY no está definida.",
+    "Error fatal: La variable de entorno SENDGRID_API_KEY no está definida."
   );
   process.exit(1);
 }
