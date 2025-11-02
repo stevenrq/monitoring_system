@@ -1,5 +1,6 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { SensorPayload } from "../interfaces/sensor-payload";
+import { toZonedISOString } from "../utils/timezone";
 
 interface Threshold {
   min?: number;
@@ -14,7 +15,7 @@ const lastAlerts: Record<string, number> = {};
 /**
  * Tiempo mínimo entre alertas del mismo tipo para el mismo dispositivo (en ms).
  */
-const ALERT_COOLDOWN_MS = 10000; // 10 segundos
+const ALERT_COOLDOWN_MS = 60000;
 
 /**
  * Umbrales configurados por el usuario para cada tipo de sensor.
@@ -139,7 +140,7 @@ export const checkSensorDataForAlerts = (
     event: "sensorAlert",
     deviceId,
     message: alertMessage,
-    timestamp: new Date().toISOString(),
+    timestamp: toZonedISOString(new Date()),
   };
 
   // Enviar a todos los clientes conectados
