@@ -2,6 +2,16 @@ import { PipelineStage } from "mongoose";
 import SensorData, { ISensorDataDocument } from "../models/sensor-data.model";
 import { DEFAULT_TIMEZONE, toZonedISOString } from "../utils/timezone";
 
+const escapeRegex = (value: string): string =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const buildDeviceIdExpression = (value?: string) => {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  return { $regex: `^${escapeRegex(trimmed)}$`, $options: "i" };
+};
+
 /**
  * Representa la última lectura registrada de un sensor.
  */
@@ -73,7 +83,10 @@ export const getLatestSensorReadings = async (
   const matchStage: Record<string, unknown> = {};
 
   if (deviceId) {
-    matchStage.deviceId = deviceId;
+    const deviceExpr = buildDeviceIdExpression(deviceId);
+    if (deviceExpr) {
+      matchStage.deviceId = deviceExpr;
+    }
   }
 
   const pipeline: PipelineStage[] = [];
@@ -137,7 +150,10 @@ export const getSensorReport = async (
   const matchStage: Record<string, unknown> = {};
 
   if (filters.deviceId) {
-    matchStage.deviceId = filters.deviceId;
+    const deviceExpr = buildDeviceIdExpression(filters.deviceId);
+    if (deviceExpr) {
+      matchStage.deviceId = deviceExpr;
+    }
   }
 
   if (filters.sensorType) {
@@ -239,7 +255,10 @@ export const getRawSensorData = async (
   const query: Record<string, unknown> = {};
 
   if (filters.deviceId) {
-    query.deviceId = filters.deviceId;
+    const deviceExpr = buildDeviceIdExpression(filters.deviceId);
+    if (deviceExpr) {
+      query.deviceId = deviceExpr;
+    }
   }
 
   if (filters.sensorType) {

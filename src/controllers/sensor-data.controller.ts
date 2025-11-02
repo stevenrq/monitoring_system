@@ -49,11 +49,18 @@ const parseLimit = (value: unknown): number | undefined => {
 /**
  * Construye un objeto de filtros a partir de los parámetros de la petición.
  */
+const normalizeDeviceId = (value: unknown): string | undefined => {
+  if (!value) return undefined;
+  const normalizedValue = Array.isArray(value) ? value[0] : value;
+  const trimmed = String(normalizedValue).trim();
+  return trimmed ? trimmed.toUpperCase() : undefined;
+};
+
 const buildFilters = (req: Request): SensorReportFilters => {
   const { deviceId, sensorType, from, to, limit } = req.query;
 
   return {
-    deviceId: deviceId ? String(deviceId) : undefined,
+    deviceId: normalizeDeviceId(deviceId),
     sensorType: sensorType ? String(sensorType) : undefined,
     from: parseDate(from),
     to: parseDate(to),
@@ -68,7 +75,7 @@ export const latestSensorReadings = async (req: Request, res: Response) => {
   try {
     const { deviceId } = req.query;
     const readings = await getLatestSensorReadings(
-      deviceId ? String(deviceId) : undefined
+      normalizeDeviceId(deviceId)
     );
     res.status(200).json(readings);
   } catch (error) {
