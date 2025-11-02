@@ -366,8 +366,9 @@
           logMessage(
             `El umbral de ${getSensorName(
               sensorType
-            )} es fijo. Se aplicará el valor del sistema.`
+            )} es fijo y no requiere configuración.`
           );
+          return;
         }
 
         registerKnownDevice(deviceId);

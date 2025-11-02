@@ -37,6 +37,9 @@ export function setAlertThreshold(
   const normalizedDeviceId = deviceId.trim();
   const normalizedSensorType = sensorType.trim();
 
+  const isClearing =
+    thresholds.min === undefined && thresholds.max === undefined;
+
   if (!normalizedDeviceId) {
     throw new Error("El dispositivo es obligatorio para configurar umbrales.");
   }
@@ -64,6 +67,7 @@ export function setAlertThreshold(
   }
 
   if (
+    !isClearing &&
     normalizedDeviceId === "ESP32_1" &&
     normalizedSensorType === "soil_humidity"
   ) {

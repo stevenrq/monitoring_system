@@ -46,6 +46,11 @@ export const PlantSchema = new Schema<IPlantDocument, IPlantModel>(
   }
 );
 
+PlantSchema.index(
+  { name: 1 },
+  { unique: true, collation: { locale: "es", strength: 2 } }
+);
+
 function validateThresholds(value: PlantThresholds | undefined) {
   if (!value) {
     throw new Error(

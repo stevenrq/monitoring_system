@@ -4,7 +4,7 @@ import {
   PlantThresholds,
   PlantUpdatePayload,
 } from "../interfaces/plant.interface";
-import { SENSOR_TYPES } from "../constants/sensor-types";
+import { SENSOR_TYPES, SensorType } from "../constants/sensor-types";
 import Plant from "../models/plant.model";
 import {
   ALERT_ENABLED_DEVICE_IDS,
@@ -12,14 +12,35 @@ import {
 } from "./notification.service";
 
 const DEFAULT_DEVICE_ID = "ESP32_1";
-const SOIL_HUMIDITY_SENSOR = "soil_humidity";
+const SOIL_HUMIDITY_SENSOR: SensorType = "soil_humidity";
 const SOIL_HUMIDITY_MIN = 20;
+const DEVICE_ID_INDEX = "deviceId_1";
 
 export const createPlant = async (
   plantData: IPlant
 ): Promise<IPlantDocument> => {
+  const normalizedName = plantData.name?.trim();
+  if (!normalizedName) {
+    throw new Error("El nombre de la planta es obligatorio.");
+  }
+
+  if (!plantData.thresholds) {
+    throw new Error(
+      "Debes proporcionar los umbrales de la planta para crearla."
+    );
+  }
+
+  const existingByName = await Plant.findOne({ name: normalizedName }).collation({
+    locale: "es",
+    strength: 2,
+  });
+  if (existingByName) {
+    throw new Error(`Ya existe una planta con el nombre "${normalizedName}".`);
+  }
+
   const payload: IPlant = {
     ...plantData,
+    name: normalizedName,
     deviceId: (plantData.deviceId || DEFAULT_DEVICE_ID).trim(),
     thresholds: normalizeThresholds(plantData.thresholds),
   };
@@ -50,7 +71,21 @@ export const updatePlant = async (
   }
 
   if (updateData.name !== undefined) {
-    plant.name = updateData.name;
+    const normalizedName = updateData.name.trim();
+    if (!normalizedName) {
+      throw new Error("El nombre de la planta no puede estar vacío.");
+    }
+
+    const existingByName = await Plant.findOne({
+      name: normalizedName,
+      _id: { $ne: plant._id },
+    }).collation({ locale: "es", strength: 2 });
+
+    if (existingByName) {
+      throw new Error(`Ya existe una planta con el nombre "${normalizedName}".`);
+    }
+
+    plant.name = normalizedName;
   }
 
   plant.deviceId = DEFAULT_DEVICE_ID;
@@ -80,7 +115,15 @@ export const deletePlant = async (
 ): Promise<IPlantDocument | null> => {
   const plant = await Plant.findByIdAndDelete(plantId);
   if (plant) {
-    clearDeviceThresholds(DEFAULT_DEVICE_ID);
+    const latest = await Plant.find()
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .limit(1);
+
+    if (latest.length) {
+      await applyPlantThresholds(latest[0]);
+    } else {
+      clearDeviceThresholds(DEFAULT_DEVICE_ID);
+    }
   }
   return plant;
 };
@@ -90,7 +133,24 @@ export const getPlantCount = async (): Promise<number | null> => {
 };
 
 export const initializePlantThresholds = async (): Promise<void> => {
-  const plants = await Plant.find();
+  try {
+    await Plant.collection.dropIndex(DEVICE_ID_INDEX);
+    console.log(`Índice '${DEVICE_ID_INDEX}' eliminado (si existía).`);
+  } catch (error) {
+    const codeName =
+      typeof error === "object" && error && "codeName" in error
+        ? (error as { codeName?: string }).codeName
+        : undefined;
+
+    if (codeName !== "IndexNotFound") {
+      console.warn(
+        `No fue posible eliminar el índice '${DEVICE_ID_INDEX}':`,
+        error
+      );
+    }
+  }
+
+  const plants = await Plant.find().sort({ updatedAt: 1, createdAt: 1 });
   for (const plant of plants) {
     await applyPlantThresholds(plant);
   }
@@ -127,11 +187,17 @@ function clearDeviceThresholds(deviceId: string) {
 }
 
 function normalizeThresholds(thresholds?: PlantThresholds): PlantThresholds {
-  const safe: PlantThresholds = {
-    ...(thresholds || ({} as PlantThresholds)),
-  };
+  const normalized = {} as PlantThresholds;
 
-  safe[SOIL_HUMIDITY_SENSOR] = { min: SOIL_HUMIDITY_MIN };
+  for (const sensor of SENSOR_TYPES) {
+    if (sensor === SOIL_HUMIDITY_SENSOR) {
+      normalized[sensor] = { min: SOIL_HUMIDITY_MIN };
+      continue;
+    }
 
-  return safe;
+    const value = thresholds?.[sensor];
+    normalized[sensor] = value ? { ...value } : {};
+  }
+
+  return normalized;
 }
