@@ -14,7 +14,7 @@ const lastAlerts: Record<string, number> = {};
 /**
  * Tiempo mínimo entre alertas del mismo tipo para el mismo dispositivo (en ms).
  */
-const ALERT_COOLDOWN_MS = 60000;
+const ALERT_COOLDOWN_MS = 10000; // 10 segundos
 
 /**
  * Umbrales configurados por el usuario para cada tipo de sensor.
@@ -39,7 +39,9 @@ export function setAlertThreshold(
   }
 
   if (!normalizedSensorType) {
-    throw new Error("El tipo de sensor es obligatorio para configurar umbrales.");
+    throw new Error(
+      "El tipo de sensor es obligatorio para configurar umbrales."
+    );
   }
 
   if (thresholds.min !== undefined && !Number.isNaN(thresholds.min)) {
@@ -48,6 +50,10 @@ export function setAlertThreshold(
 
   if (thresholds.max !== undefined && !Number.isNaN(thresholds.max)) {
     sanitized.max = thresholds.max;
+  }
+
+  if (normalizedSensorType === "solar_radiation") {
+    delete sanitized.min;
   }
 
   if (
