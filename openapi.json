@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "http://34.227.8.130:3000/api",
+      "url": "http://34.227.8.130:3000",
       "description": "Servidor de producción",
       "variables": {
         "backendUrl": {
@@ -17,7 +17,7 @@
       }
     },
     {
-      "url": "http://localhost:3000/api",
+      "url": "http://localhost:3000",
       "description": "Servidor principal de la API",
       "variables": {
         "backendUrl": {
