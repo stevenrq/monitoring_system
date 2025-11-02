@@ -7,7 +7,7 @@ const RAW = process.env.BACKEND_URL!; // p.ej. "https://monitoring-system-opbd.o
 const SERVER_URL = RAW.replace(/^http/, "ws").replace(/\/?$/, "/"); // -> wss://.../ o ws://.../
 
 if (!process.env.BACKEND_URL) {
-  console.error("❌ La variable BACKEND_URL no está definida");
+  console.error("La variable BACKEND_URL no está definida");
   process.exit(1);
 }
 
@@ -77,13 +77,13 @@ function createDeviceSimulator(deviceId: DeviceId) {
           .sensors()
           .map((s) => ({ ...s, deviceId }));
         ws.send(JSON.stringify(readings));
-        console.log(`[${deviceId}] 📤 Enviando datos:`, readings);
+        console.log(`[${deviceId}] Enviando datos:`, readings);
       }
     }, SIMULATION_INTERVAL_MS);
   };
 
   ws.on("open", () => {
-    console.log(`[${deviceId}] ✅ Conectado a ${SERVER_URL}`);
+    console.log(`[${deviceId}] Conectado a ${SERVER_URL}`);
     ws.send(JSON.stringify({ event: "registerDevice", deviceId }));
     startSender();
   });
@@ -93,13 +93,13 @@ function createDeviceSimulator(deviceId: DeviceId) {
   });
 
   ws.on("close", () => {
-    console.log(`[${deviceId}] 🔌 Desconectado`);
+    console.log(`[${deviceId}] Desconectado`);
     clearInterval(timer);
     setTimeout(() => createDeviceSimulator(deviceId), 3000);
   });
 
   ws.on("error", (err) => {
-    console.error(`[${deviceId}] ❌ Error:`, err.message);
+    console.error(`[${deviceId}] Error:`, err.message);
   });
 }
 

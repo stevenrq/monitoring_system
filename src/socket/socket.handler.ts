@@ -16,7 +16,7 @@ export function initializeWebSocket(server: http.Server) {
 
   wss.on("connection", (ws: WebSocket, req) => {
     const path = req.url || "/";
-    console.log(`✅ Nueva conexión WS: ${path}`);
+    console.log(`Nueva conexión WS: ${path}`);
 
     ws.on("message", async (msg) => {
       try {
@@ -24,13 +24,13 @@ export function initializeWebSocket(server: http.Server) {
 
         if (data.event === "registerDevice") {
           connectedDevices.set(data.deviceId, ws);
-          console.log(`📡 Dispositivo registrado: ${data.deviceId}`);
+          console.log(`Dispositivo registrado: ${data.deviceId}`);
           return;
         }
 
         if (data.event === "subscribeToDevice") {
           webClients.add(ws);
-          console.log(`👨‍💻 Cliente suscrito a ${data.deviceId}`);
+          console.log(`Cliente suscrito a ${data.deviceId}`);
           return;
         }
 
@@ -50,7 +50,7 @@ export function initializeWebSocket(server: http.Server) {
 
             const newSensorData = new SensorData(sensorData);
             await newSensorData.save();
-            console.log(`💾 Datos guardados de ${deviceId}:`, sensorData);
+            console.log(`Datos guardados de ${deviceId}:`, sensorData);
 
             const payload = JSON.stringify({
               event: "newSensorData",
@@ -66,12 +66,12 @@ export function initializeWebSocket(server: http.Server) {
           ws.send(
             JSON.stringify({
               event: "ack",
-              message: "✅ Datos recibidos correctamente",
+              message: "Datos recibidos correctamente",
             })
           );
         }
       } catch (err) {
-        console.error("❌ Error al procesar mensaje:", err);
+        console.error("Error al procesar mensaje:", err);
         ws.send(
           JSON.stringify({
             event: "dataError",
@@ -82,7 +82,7 @@ export function initializeWebSocket(server: http.Server) {
     });
 
     ws.on("close", () => {
-      console.log("🔌 Conexión cerrada");
+      console.log("Conexión cerrada");
       for (const [id, sock] of connectedDevices.entries()) {
         if (sock === ws) connectedDevices.delete(id);
       }
@@ -90,6 +90,6 @@ export function initializeWebSocket(server: http.Server) {
     });
   });
 
-  console.log("🧠 WebSocket inicializado correctamente");
+  console.log("WebSocket inicializado correctamente");
   return wss;
 }

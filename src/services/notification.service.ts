@@ -41,11 +41,11 @@ export const checkSensorDataForAlerts = (
   let alertMessage: string | null = null;
 
   if (thresholds.max !== undefined && value > thresholds.max) {
-    alertMessage = `⚠️ ¡Alerta en ${deviceId}! ${getSensorName(sensorType)} ha superado el máximo: ${value.toFixed(
+    alertMessage = `¡Alerta en ${deviceId}! ${getSensorName(sensorType)} ha superado el máximo: ${value.toFixed(
       2
     )} ${unit} (Máx: ${thresholds.max} ${unit}).`;
   } else if (thresholds.min !== undefined && value < thresholds.min) {
-    alertMessage = `⚠️ ¡Alerta en ${deviceId}! ${getSensorName(sensorType)} está por debajo del mínimo: ${value.toFixed(
+    alertMessage = `¡Alerta en ${deviceId}! ${getSensorName(sensorType)} está por debajo del mínimo: ${value.toFixed(
       2
     )} ${unit} (Mín: ${thresholds.min} ${unit}).`;
   }
@@ -64,7 +64,7 @@ export const checkSensorDataForAlerts = (
   // Registrar la alerta
   lastAlerts[alertKey] = now;
 
-  console.log(`🚨 ALERTA: ${alertMessage}`);
+  console.log(`ALERTA: ${alertMessage}`);
 
   const alertPayload = {
     event: "sensorAlert",

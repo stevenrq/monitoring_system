@@ -82,15 +82,15 @@
       const socket = new WebSocket(WS_URL);
 
       socket.onopen = () => {
-        logMessage("✅ Conectado al servidor WebSocket.");
+        logMessage("Conectado al servidor WebSocket.");
       };
 
       socket.onclose = (event) => {
-        logMessage(`❌ Desconectado del servidor (${event.code}).`);
+        logMessage(`Desconectado del servidor (${event.code}).`);
       };
 
       socket.onerror = (err) => {
-        logMessage(`⚠️ Error en WebSocket: ${err.message || err}`);
+        logMessage(`Error en WebSocket: ${err.message || err}`);
       };
 
       socket.onmessage = (event) => {
@@ -104,11 +104,11 @@
           } else if (data.event === "sensorAlert") {
             const { deviceId, message } = data;
             showNotification(`Alerta en ${deviceId}`, message);
-            logMessage(`🚨 ${message}`);
+            logMessage(`${message}`);
           } else if (data.event === "ack") {
-            logMessage("📩 " + data.message);
+            logMessage(data.message);
           } else if (data.event === "dataError") {
-            logMessage("⚠️ Error del servidor: " + data.message);
+            logMessage("Error del servidor: " + data.message);
           }
         } catch (err) {
           console.error("Error procesando mensaje:", err, event.data);

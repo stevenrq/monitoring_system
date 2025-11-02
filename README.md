@@ -1,11 +1,11 @@
-# Sistema de Monitoreo Ambiental 🌱
+# Sistema de Monitoreo Ambiental
 
 Este proyecto es el backend para un sistema de monitoreo ambiental. Ha sido desarrollado con Node.js y Express,
 utilizando TypeScript para un código más robusto y mantenible. La base de datos utilizada es MongoDB con Mongoose como
 ODM. El sistema se encarga de la gestión de usuarios, la autenticación y la autorización para una aplicación que recibe
 datos de sensores programados con Arduino y los visualiza en un frontend desarrollado con Flutter.
 
-## ✨ Características Principales
+## Características Principales
 
 - **Gestión de Usuarios**: Sistema de registro y administración de usuarios con diferentes roles (administrador y
   usuario).
@@ -21,7 +21,7 @@ datos de sensores programados con Arduino y los visualiza en un frontend desarro
 - **Estructura Escalable**: El código está organizado en controladores, servicios, modelos y rutas, siguiendo un patrón
   que facilita el mantenimiento y la expansión del proyecto.
 
-## 🛠️ Tecnologías Utilizadas
+## Tecnologías Utilizadas
 
 - **Backend**: Node.js, Express, TypeScript
 - **Base de Datos**: MongoDB, Mongoose
@@ -29,7 +29,7 @@ datos de sensores programados con Arduino y los visualiza en un frontend desarro
 - **Manejo de dependencias**: npm
 - **Entorno de desarrollo**: ts-node-dev, dotenv
 
-## 📂 Estructura del Proyecto
+## Estructura del Proyecto
 
 ```
 monitoring_system/
@@ -50,13 +50,13 @@ monitoring_system/
 └── tsconfig.json             # Configuración del compilador de TypeScript
 ```
 
-## 📑 Documentación con DeepWiki
+## Documentación con DeepWiki
 
 Para más información sobre el proyecto, puedes preguntarle a DeepWiki:
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/stevenrq/monitoring_system)
 
-## 🚀 Empezando
+## Empezando
 
 Sigue estas instrucciones para tener una copia del proyecto corriendo en tu máquina local para desarrollo y pruebas.
 
@@ -106,7 +106,7 @@ Asegúrate de tener instalado lo siguiente:
    NODE_ENV="development"
    ```
 
-## ▶️ Ejecutando la Aplicación
+## Ejecutando la Aplicación
 
 ### Modo de desarrollo (con recarga automática)
 
@@ -128,7 +128,7 @@ npm run dev
    npm start
    ```
 
-## 📜 Scripts Adicionales
+## Scripts Adicionales
 
 ### Crear Usuario Administrador
 
@@ -147,7 +147,7 @@ correcta. Luego, ejecuta:
 npx ts-node src/create-admin.ts
 ```
 
-## 📋 API Endpoints
+## API Endpoints
 
 A continuación se detallan los endpoints disponibles en la API. Todas las rutas están prefijadas con `/api`.
 
@@ -171,7 +171,7 @@ Todas estas rutas requieren un `accessToken` válido y rol de admin.
 | `PUT`    | `/:id`   | Actualiza un usuario existente por su ID. | Sí (Admin)    |
 | `DELETE` | `/:id`   | Elimina un usuario por su ID.             | Sí (Admin)    |
 
-## 📈 Monitoreo en Tiempo Real con WebSockets
+## Monitoreo en Tiempo Real con WebSockets
 
 Además de la API REST para la gestión de usuarios, el proyecto incluye una funcionalidad de monitoreo en tiempo real utilizando WebSockets. Esto permite que dispositivos IoT (como un ESP32) envíen datos de sensores al servidor, y que clientes web se suscriban para visualizar estos datos en vivo.
 
@@ -179,25 +179,25 @@ Además de la API REST para la gestión de usuarios, el proyecto incluye una fun
 
 La comunicación en tiempo real se gestiona con **Socket.IO**, que está organizado en dos *namespaces* para separar la lógica de los dispositivos y de los clientes web:
 
--   **`/devices`**: Este namespace está dedicado a los dispositivos IoT.
-    -   **Eventos**:
-        -   `registerDevice(deviceId)`: Un dispositivo se une a una sala con su propio `deviceId` para identificarse.
-        -   `sensorData(payload)`: El dispositivo envía un array de datos de sus sensores. El servidor guarda estos datos en la base de datos y los retransmite a los clientes web suscritos.
+- **`/devices`**: Este namespace está dedicado a los dispositivos IoT.
+  - **Eventos**:
+    - `registerDevice(deviceId)`: Un dispositivo se une a una sala con su propio `deviceId` para identificarse.
+    - `sensorData(payload)`: El dispositivo envía un array de datos de sus sensores. El servidor guarda estos datos en la base de datos y los retransmite a los clientes web suscritos.
 
--   **`/web-clients`**: Este namespace es para los clientes web (dashboards).
-    -   **Eventos**:
-        -   `subscribeToDevice(deviceId)`: Un cliente web se une a la sala del `deviceId` especificado para empezar a recibir sus datos.
-        -   `unsubscribeFromDevice(deviceId)`: El cliente deja de recibir actualizaciones para ese dispositivo.
-        -   `newSensorData(data)`: Evento que recibe el cliente con los nuevos datos de un sensor del dispositivo al que está suscrito.
+- **`/web-clients`**: Este namespace es para los clientes web (dashboards).
+  - **Eventos**:
+    - `subscribeToDevice(deviceId)`: Un cliente web se une a la sala del `deviceId` especificado para empezar a recibir sus datos.
+    - `unsubscribeFromDevice(deviceId)`: El cliente deja de recibir actualizaciones para ese dispositivo.
+    - `newSensorData(data)`: Evento que recibe el cliente con los nuevos datos de un sensor del dispositivo al que está suscrito.
 
 ### Simulador de Dispositivos ESP32
 
 Para facilitar las pruebas sin hardware físico, el proyecto incluye un simulador de dispositivos.
 
--   **Archivo**: `src/esp32-simulator.ts`
--   **Funcionalidad**: Simula dos dispositivos (`ESP32_1` y `ESP32_2`) que se conectan al servidor y envían datos de sensores cada 5 segundos.
-    -   `ESP32_1`: Envía datos de temperatura y humedad.
-    -   `ESP32_2`: Envía datos de calidad del aire y caudal hidrológico.
+- **Archivo**: `src/esp32-simulator.ts`
+- **Funcionalidad**: Simula dos dispositivos (`ESP32_1` y `ESP32_2`) que se conectan al servidor y envían datos de sensores cada 5 segundos.
+  - `ESP32_1`: Envía datos de temperatura y humedad.
+  - `ESP32_2`: Envía datos de calidad del aire y caudal hidrológico.
 
 #### Para ejecutar el simulador
 
@@ -211,24 +211,27 @@ npx ts-node src/esp32-simulator.ts
 
 Se proporciona un cliente web simple para visualizar los datos en tiempo real.
 
--   **Archivo**: `src/web-client.html`
--   **Funcionalidad**: Es una página HTML con JavaScript que se conecta al namespace `/web-clients`. Permite al usuario introducir el `deviceId` de un dispositivo para suscribirse y ver sus lecturas de sensores en tarjetas que se actualizan dinámicamente.
+- **Archivo**: `src/web-client.html`
+- **Funcionalidad**: Es una página HTML con JavaScript que se conecta al namespace `/web-clients`. Permite al usuario introducir el `deviceId` de un dispositivo para suscribirse y ver sus lecturas de sensores en tarjetas que se actualizan dinámicamente.
 
 ### Cómo Probar la Funcionalidad de Monitoreo
 
 Sigue estos pasos para ver el sistema de monitoreo en acción:
 
-1.  **Inicia el servidor principal** (si aún no lo has hecho):
+1. **Inicia el servidor principal** (si aún no lo has hecho):
+
     ```bash
     npm run dev
     ```
 
-2.  **Ejecuta el simulador de dispositivos** en una terminal separada:
+2. **Ejecuta el simulador de dispositivos** en una terminal separada:
+
     ```bash
     npx ts-node src/esp32-simulator.ts
     ```
+
     Verás en la consola los logs de los dispositivos conectándose y enviando datos.
 
-3.  **Abre el cliente web**: Abre el archivo `src/web-client.html` directamente en tu navegador web.
+3. **Abre el cliente web**: Abre el archivo `src/web-client.html` directamente en tu navegador web.
 
-4.  **Suscríbete a un dispositivo**: En la página web, introduce `ESP32_1` o `ESP32_2` y haz clic en "Suscribirse". Inmediatamente, aparecerá una tarjeta para ese dispositivo y comenzarás a ver los datos del sensor actualizándose en tiempo real.
+4. **Suscríbete a un dispositivo**: En la página web, introduce `ESP32_1` o `ESP32_2` y haz clic en "Suscribirse". Inmediatamente, aparecerá una tarjeta para ese dispositivo y comenzarás a ver los datos del sensor actualizándose en tiempo real.
