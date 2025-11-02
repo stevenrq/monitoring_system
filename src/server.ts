@@ -10,5 +10,5 @@ initializeWebSocket(server);
 
 server.listen(PORT, () => {
   console.log(`Servidor escuchando en puerto ${PORT}`);
-  console.log(`WebSocket activo en wss://monitoring-system-opbd.onrender.com`);
+  console.log(`WebSocket activo en ws://34.227.8.130:3000`);
 });

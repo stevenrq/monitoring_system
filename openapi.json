@@ -7,11 +7,11 @@
   },
   "servers": [
     {
-      "url": "https://monitoring-system-opbd.onrender.com/api",
+      "url": "http://34.227.8.130:3000/api",
       "description": "Servidor de producción",
       "variables": {
         "backendUrl": {
-          "default": "https://monitoring-system-opbd.onrender.com",
+          "default": "http://34.227.8.130:3000",
           "description": "URL base del backend."
         }
       }
