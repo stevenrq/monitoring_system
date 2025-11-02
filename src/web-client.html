@@ -500,8 +500,7 @@
         const unitLabel = meta.unit || "";
         const examples = meta.examples || {};
         const isReadOnly = !!meta.readOnly;
-        const disableMin =
-          selectedType === "solar_radiation" || isReadOnly;
+        const disableMin = selectedType === "solar_radiation" || isReadOnly;
         const disableMax =
           selectedType === "solar_radiation" ? false : isReadOnly;
 
