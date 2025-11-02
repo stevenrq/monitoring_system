@@ -1,7 +1,10 @@
 import { WebSocketServer, WebSocket } from "ws";
 import SensorData from "../models/sensor-data.model";
 import { SensorPayload } from "../interfaces/sensor-payload";
-import { checkSensorDataForAlerts } from "../services/notification.service";
+import {
+  checkSensorDataForAlerts,
+  setAlertThreshold,
+} from "../services/notification.service";
 import * as http from "node:http";
 
 export function initializeWebSocket(server: http.Server) {
@@ -31,6 +34,83 @@ export function initializeWebSocket(server: http.Server) {
         if (data.event === "subscribeToDevice") {
           webClients.add(ws);
           console.log(`Cliente suscrito a ${data.deviceId}`);
+          return;
+        }
+
+        if (data.event === "updateThresholds") {
+          webClients.add(ws);
+          const { sensorType, deviceId } = data;
+
+          if (!deviceId || typeof deviceId !== "string") {
+            ws.send(
+              JSON.stringify({
+                event: "thresholdUpdateError",
+                message: "Debes indicar un dispositivo válido.",
+              })
+            );
+            return;
+          }
+
+          if (!sensorType || typeof sensorType !== "string") {
+            ws.send(
+              JSON.stringify({
+                event: "thresholdUpdateError",
+                message: "Tipo de sensor inválido.",
+              })
+            );
+            return;
+          }
+
+          const parsedMin =
+            data.min !== undefined && data.min !== ""
+              ? Number(data.min)
+              : undefined;
+          const parsedMax =
+            data.max !== undefined && data.max !== ""
+              ? Number(data.max)
+              : undefined;
+
+          if (
+            (parsedMin !== undefined && Number.isNaN(parsedMin)) ||
+            (parsedMax !== undefined && Number.isNaN(parsedMax))
+          ) {
+            ws.send(
+              JSON.stringify({
+                event: "thresholdUpdateError",
+                message: "Los umbrales deben ser números válidos.",
+              })
+            );
+            return;
+          }
+
+          try {
+            const updated = setAlertThreshold(deviceId, sensorType, {
+              min: parsedMin,
+              max: parsedMax,
+            });
+
+            const payload = JSON.stringify({
+              event: "thresholdsUpdated",
+              deviceId,
+              sensorType,
+              thresholds: updated || null,
+            });
+
+            for (const client of webClients) {
+              if (client.readyState === WebSocket.OPEN) client.send(payload);
+            }
+          } catch (error) {
+            const message =
+              error instanceof Error
+                ? error.message
+                : "No se pudo actualizar el umbral.";
+            ws.send(
+              JSON.stringify({
+                event: "thresholdUpdateError",
+                message,
+              })
+            );
+          }
           return;
         }
 

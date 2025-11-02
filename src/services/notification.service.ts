@@ -17,13 +17,76 @@ const lastAlerts: Record<string, number> = {};
 const ALERT_COOLDOWN_MS = 60000;
 
 /**
- * Umbrales por tipo de sensor.
+ * Umbrales configurados por el usuario para cada tipo de sensor.
+ * Se mantienen en memoria hasta que el proceso se reinicia.
  */
-const alertThresholds: Record<string, Threshold> = {
-  temperature: { min: 10, max: 40 },
-  humidity: { min: 25, max: 80 },
-  water_level: { min: 20, max: 90 },
-};
+const alertThresholds: Record<string, Record<string, Threshold>> = {};
+
+/**
+ * Actualiza los umbrales permitidos para un tipo de sensor.
+ */
+export function setAlertThreshold(
+  deviceId: string,
+  sensorType: string,
+  thresholds: Threshold
+): Threshold | undefined {
+  const sanitized: Threshold = {};
+  const normalizedDeviceId = deviceId.trim();
+  const normalizedSensorType = sensorType.trim();
+
+  if (!normalizedDeviceId) {
+    throw new Error("El dispositivo es obligatorio para configurar umbrales.");
+  }
+
+  if (!normalizedSensorType) {
+    throw new Error("El tipo de sensor es obligatorio para configurar umbrales.");
+  }
+
+  if (thresholds.min !== undefined && !Number.isNaN(thresholds.min)) {
+    sanitized.min = thresholds.min;
+  }
+
+  if (thresholds.max !== undefined && !Number.isNaN(thresholds.max)) {
+    sanitized.max = thresholds.max;
+  }
+
+  if (
+    sanitized.min === undefined &&
+    sanitized.max === undefined &&
+    alertThresholds[normalizedDeviceId]?.[normalizedSensorType]
+  ) {
+    delete alertThresholds[normalizedDeviceId][normalizedSensorType];
+    if (Object.keys(alertThresholds[normalizedDeviceId]).length === 0) {
+      delete alertThresholds[normalizedDeviceId];
+    }
+    return undefined;
+  }
+
+  if (sanitized.min !== undefined && sanitized.max !== undefined) {
+    if (sanitized.min > sanitized.max) {
+      throw new Error(
+        `El mínimo (${sanitized.min}) no puede ser mayor que el máximo (${sanitized.max}) para ${sensorType}`
+      );
+    }
+  }
+
+  if (!alertThresholds[normalizedDeviceId]) {
+    alertThresholds[normalizedDeviceId] = {};
+  }
+
+  alertThresholds[normalizedDeviceId][normalizedSensorType] = sanitized;
+  return alertThresholds[normalizedDeviceId][normalizedSensorType];
+}
+
+/**
+ * Obtiene los umbrales configurados para un tipo de sensor.
+ */
+export function getAlertThreshold(
+  deviceId: string,
+  sensorType: string
+): Threshold | undefined {
+  return alertThresholds[deviceId]?.[sensorType];
+}
 
 /**
  * Envía alertas a todos los clientes web conectados si los datos superan los umbrales.
@@ -35,7 +98,7 @@ export const checkSensorDataForAlerts = (
   sensorData: SensorPayload
 ) => {
   const { deviceId, sensorType, value, unit } = sensorData;
-  const thresholds = alertThresholds[sensorType];
+  const thresholds = getAlertThreshold(deviceId, sensorType);
   if (!thresholds) return;
 
   let alertMessage: string | null = null;
@@ -91,7 +154,8 @@ function getSensorName(sensorType: string): string {
   const names: { [key: string]: string } = {
     temperature: "La Temperatura",
     humidity: "La Humedad",
-    water_level: "El Nivel de Agua",
+    soil_humidity: "La Humedad del Suelo",
+    solar_radiation: "La Radiación Solar",
   };
   return names[sensorType] || sensorType;
 }

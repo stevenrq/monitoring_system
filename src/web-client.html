@@ -63,6 +63,73 @@
         </div>
       </div>
 
+      <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Configuración de Umbrales</h5>
+          <form id="thresholdForm" class="row g-3 align-items-end">
+            <div class="col-md-3">
+              <label for="thresholdDeviceInput" class="form-label">Dispositivo</label>
+              <input
+                type="text"
+                id="thresholdDeviceInput"
+                class="form-control"
+                placeholder="Ej: ESP32_1"
+                list="devicesDatalist"
+              />
+              <datalist id="devicesDatalist"></datalist>
+            </div>
+            <div class="col-md-3">
+              <label for="sensorTypeSelect" class="form-label">Sensor</label>
+              <select id="sensorTypeSelect" class="form-select">
+                <option value="temperature">Temperatura</option>
+                <option value="humidity">Humedad</option>
+                <option value="soil_humidity">Humedad del Suelo</option>
+                <option value="solar_radiation">Radiación Solar</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label for="minThresholdInput" class="form-label"
+                >Umbral Mínimo</label
+              >
+              <input
+                type="number"
+                step="any"
+                id="minThresholdInput"
+                class="form-control"
+                placeholder="Ej: 15"
+              />
+              <small id="minThresholdHelp" class="form-text text-muted">
+                Define el mínimo permitido para el sensor seleccionado.
+              </small>
+            </div>
+            <div class="col-md-2">
+              <label for="maxThresholdInput" class="form-label"
+                >Umbral Máximo</label
+              >
+              <input
+                type="number"
+                step="any"
+                id="maxThresholdInput"
+                class="form-control"
+                placeholder="Ej: 35"
+              />
+              <small id="maxThresholdHelp" class="form-text text-muted">
+                Define el máximo permitido para el sensor seleccionado.
+              </small>
+            </div>
+            <div class="col-md-2">
+              <button type="submit" class="btn btn-success w-100 mt-4 mt-md-0">
+                <i class="bi bi-save"></i> Guardar
+              </button>
+            </div>
+          </form>
+          <small class="text-muted"
+            >Deja en blanco un valor para quitar el umbral
+            correspondiente.</small
+          >
+        </div>
+      </div>
+
       <div id="devices-container"></div>
 
       <div class="mt-4">
@@ -77,8 +144,94 @@
       const subscribeBtn = document.getElementById("subscribeBtn");
       const devicesContainer = document.getElementById("devices-container");
       const subscribedDevices = new Set();
+      const thresholdForm = document.getElementById("thresholdForm");
+      const sensorTypeSelect = document.getElementById("sensorTypeSelect");
+      const minThresholdInput = document.getElementById("minThresholdInput");
+      const maxThresholdInput = document.getElementById("maxThresholdInput");
+      const thresholdDeviceInput = document.getElementById(
+        "thresholdDeviceInput"
+      );
+      const devicesDatalist = document.getElementById("devicesDatalist");
+      const minThresholdHelp = document.getElementById("minThresholdHelp");
+      const maxThresholdHelp = document.getElementById("maxThresholdHelp");
 
-      const WS_URL = "ws://34.227.8.130:3000";
+      const SENSOR_METADATA = {
+        temperature: {
+          name: "Temperatura",
+          icon: '<i class="bi bi-thermometer-half text-danger"></i>',
+          unit: "°C",
+          decimals: 2,
+          examples: { min: 15, max: 35 },
+        },
+        humidity: {
+          name: "Humedad",
+          icon: '<i class="bi bi-droplet-half text-info"></i>',
+          unit: "%",
+          decimals: 2,
+          examples: { min: 40, max: 90 },
+        },
+        soil_humidity: {
+          name: "Humedad del Suelo",
+          icon: '<i class="bi bi-flower3 text-success"></i>',
+          unit: "%",
+          decimals: 2,
+          examples: { min: 30, max: 80 },
+        },
+        solar_radiation: {
+          name: "Radiación Solar",
+          icon: '<i class="bi bi-brightness-high text-warning"></i>',
+          unit: "W/m²",
+          decimals: 0,
+          examples: { min: 200, max: 1000 },
+        },
+      };
+
+      const knownDevices = new Set(["ESP32_1", "ESP32_2"]);
+
+      function refreshDeviceSuggestions() {
+        if (!devicesDatalist) return;
+        devicesDatalist.innerHTML = Array.from(knownDevices)
+          .sort()
+          .map((device) => `<option value="${device}"></option>`)
+          .join("");
+      }
+
+      function registerKnownDevice(deviceId) {
+        const sanitized = deviceId?.trim();
+        if (!sanitized) return;
+        if (!knownDevices.has(sanitized)) {
+          knownDevices.add(sanitized);
+          refreshDeviceSuggestions();
+        }
+        if (thresholdDeviceInput && !thresholdDeviceInput.value) {
+          thresholdDeviceInput.value = sanitized;
+        }
+      }
+
+      refreshDeviceSuggestions();
+      if (thresholdDeviceInput && !thresholdDeviceInput.value) {
+        thresholdDeviceInput.value = "ESP32_1";
+      }
+
+      if (sensorTypeSelect) {
+        const currentValue = sensorTypeSelect.value;
+        sensorTypeSelect.innerHTML = Object.entries(SENSOR_METADATA)
+          .map(
+            ([value, meta]) =>
+              `<option value="${value}">${meta.name}</option>`
+          )
+          .join("");
+        if (SENSOR_METADATA[currentValue]) {
+          sensorTypeSelect.value = currentValue;
+        }
+        sensorTypeSelect.addEventListener("change", updateThresholdHints);
+      }
+
+      updateThresholdHints();
+
+      // const WS_URL = "ws://34.227.8.130:3000";
+      const WS_URL = "ws://localhost:3000";
+
       const socket = new WebSocket(WS_URL);
 
       socket.onopen = () => {
@@ -100,6 +253,7 @@
           if (data.event === "newSensorData") {
             const sensorData = data.data;
             const { deviceId, sensorType, value, unit } = sensorData;
+            registerKnownDevice(deviceId);
             updateSensorCard(deviceId, sensorType, value, unit);
           } else if (data.event === "sensorAlert") {
             const { deviceId, message } = data;
@@ -107,6 +261,24 @@
             logMessage(`${message}`);
           } else if (data.event === "ack") {
             logMessage(data.message);
+          } else if (data.event === "thresholdsUpdated") {
+            const { deviceId, sensorType, thresholds } = data;
+            registerKnownDevice(deviceId);
+            const sensorLabel = getSensorName(sensorType);
+            const minLabel =
+              thresholds && thresholds.min !== undefined
+                ? formatSensorValue(sensorType, thresholds.min)
+                : "sin mínimo";
+            const maxLabel =
+              thresholds && thresholds.max !== undefined
+                ? formatSensorValue(sensorType, thresholds.max)
+                : "sin máximo";
+            logMessage(
+              `Umbrales para ${deviceId} / ${sensorLabel} actualizados: ${minLabel} / ${maxLabel}`
+            );
+          } else if (data.event === "thresholdUpdateError") {
+            logMessage(`Error al actualizar umbrales: ${data.message}`);
+            alert(data.message);
           } else if (data.event === "dataError") {
             logMessage("Error del servidor: " + data.message);
           }
@@ -131,6 +303,7 @@
         socket.send(msg);
         logMessage(`Suscrito a: ${deviceId}`);
 
+        registerKnownDevice(deviceId);
         createDeviceCard(deviceId);
         subscribedDevices.add(deviceId);
         deviceIdInput.value = "";
@@ -140,9 +313,66 @@
         if (e.key === "Enter") subscribeBtn.click();
       });
 
+      thresholdForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const deviceId = thresholdDeviceInput
+          ? thresholdDeviceInput.value.trim()
+          : "";
+        if (!deviceId) {
+          alert("Selecciona un dispositivo para configurar umbrales.");
+          return;
+        }
+        const sensorType = sensorTypeSelect.value;
+        const minValue = minThresholdInput.value.trim();
+        const maxValue = maxThresholdInput.value.trim();
+
+        const payload = {
+          event: "updateThresholds",
+          sensorType,
+          deviceId,
+        };
+
+        if (minValue !== "") {
+          const parsedMin = Number(minValue);
+          if (Number.isNaN(parsedMin)) {
+            alert("El umbral mínimo debe ser un número válido.");
+            return;
+          }
+          payload.min = parsedMin;
+        }
+
+        if (maxValue !== "") {
+          const parsedMax = Number(maxValue);
+          if (Number.isNaN(parsedMax)) {
+            alert("El umbral máximo debe ser un número válido.");
+            return;
+          }
+          payload.max = parsedMax;
+        }
+
+        if (
+          payload.min !== undefined &&
+          payload.max !== undefined &&
+          payload.min > payload.max
+        ) {
+          alert("El umbral mínimo no puede ser mayor al máximo.");
+          return;
+        }
+
+        registerKnownDevice(deviceId);
+        socket.send(JSON.stringify(payload));
+        logMessage(
+          `Configurando umbrales para ${deviceId} / ${getSensorName(
+            sensorType
+          )}...`
+        );
+      });
+
       // --- CREACIÓN DE TARJETAS DE DISPOSITIVOS ---
       function createDeviceCard(deviceId) {
         if (document.getElementById(`device-${deviceId}`)) return;
+
+        registerKnownDevice(deviceId);
 
         const card = document.createElement("div");
         card.className = "card mb-3 shadow-sm";
@@ -173,6 +403,7 @@
       }
 
       function updateSensorCard(deviceId, sensorType, value, unit) {
+        registerKnownDevice(deviceId);
         if (!subscribedDevices.has(deviceId)) return;
 
         const sensorList = document.getElementById(`sensors-list-${deviceId}`);
@@ -189,18 +420,19 @@
           sensorItem.id = `sensor-${deviceId}-${sensorType}`;
           const icon = getSensorIcon(sensorType);
           const name = getSensorName(sensorType);
+          const formattedValue = formatSensorValue(sensorType, value, unit);
 
           sensorItem.innerHTML = `
             <span>${icon} <strong class="ms-2">${name}:</strong></span>
             <span class="badge bg-primary rounded-pill fs-6" id="value-${deviceId}-${sensorType}">
-              ${value.toFixed(2)} ${unit}
+              ${formattedValue}
             </span>`;
           sensorList.appendChild(sensorItem);
         } else {
           const badge = document.getElementById(
             `value-${deviceId}-${sensorType}`
           );
-          badge.textContent = `${value.toFixed(2)} ${unit}`;
+          badge.textContent = formatSensorValue(sensorType, value, unit);
           badge.classList.replace("bg-primary", "bg-success");
           setTimeout(
             () => badge.classList.replace("bg-success", "bg-primary"),
@@ -223,22 +455,61 @@
       }
 
       // --- UTILS ---
+      function getSensorUnit(type, fallbackUnit = "") {
+        return SENSOR_METADATA[type]?.unit || fallbackUnit || "";
+      }
+
+      function formatSensorValue(sensorType, value, fallbackUnit = "") {
+        const meta = SENSOR_METADATA[sensorType];
+        const decimals = meta?.decimals ?? 2;
+        const numericValue =
+          typeof value === "number" ? value : Number(value);
+        const formattedValue = Number.isFinite(numericValue)
+          ? numericValue.toFixed(decimals)
+          : String(value);
+        const unitLabel = getSensorUnit(sensorType, fallbackUnit);
+        return unitLabel ? `${formattedValue} ${unitLabel}` : formattedValue;
+      }
+
       function getSensorName(type) {
-        const names = {
-          temperature: "Temperatura",
-          humidity: "Humedad",
-          water_level: "Nivel de Agua",
-        };
-        return names[type] || type;
+        return SENSOR_METADATA[type]?.name || type;
       }
 
       function getSensorIcon(type) {
-        const icons = {
-          temperature: '<i class="bi bi-thermometer-half text-danger"></i>',
-          humidity: '<i class="bi bi-droplet-half text-info"></i>',
-          water_level: '<i class="bi bi-water text-primary"></i>',
-        };
-        return icons[type] || '<i class="bi bi-cpu text-muted"></i>';
+        return (
+          SENSOR_METADATA[type]?.icon || '<i class="bi bi-cpu text-muted"></i>'
+        );
+      }
+
+      function updateThresholdHints() {
+        if (!sensorTypeSelect) return;
+        const selectedType = sensorTypeSelect.value;
+        const meta = SENSOR_METADATA[selectedType] || {};
+        const sensorName = meta.name || selectedType;
+        const unitLabel = meta.unit || "";
+        const examples = meta.examples || {};
+
+        if (minThresholdInput) {
+          minThresholdInput.placeholder =
+            examples.min !== undefined ? `Ej: ${examples.min}` : "Ej: 15";
+        }
+
+        if (maxThresholdInput) {
+          maxThresholdInput.placeholder =
+            examples.max !== undefined ? `Ej: ${examples.max}` : "Ej: 35";
+        }
+
+        if (minThresholdHelp) {
+          minThresholdHelp.textContent = unitLabel
+            ? `Define el valor mínimo permitido para ${sensorName} en ${unitLabel}.`
+            : `Define el valor mínimo permitido para ${sensorName}.`;
+        }
+
+        if (maxThresholdHelp) {
+          maxThresholdHelp.textContent = unitLabel
+            ? `Define el valor máximo permitido para ${sensorName} en ${unitLabel}.`
+            : `Define el valor máximo permitido para ${sensorName}.`;
+        }
       }
 
       function logMessage(message) {
