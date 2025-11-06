@@ -15,7 +15,7 @@ const lastAlerts: Record<string, number> = {};
 /**
  * Tiempo mínimo entre alertas del mismo tipo para el mismo dispositivo (en ms).
  */
-const ALERT_COOLDOWN_MS = 60000;
+const ALERT_COOLDOWN_MS = 300000; // 5 minutos
 
 /**
  * Umbrales configurados por el usuario para cada tipo de sensor.
@@ -33,7 +33,7 @@ export function setAlertThreshold(
   sensorType: string,
   thresholds: Threshold
 ): Threshold | undefined {
-  const sanitized: Threshold = {};
+  const sanitized: Threshold = {};  
   const normalizedDeviceId = deviceId.trim();
   const normalizedSensorType = sensorType.trim();
 

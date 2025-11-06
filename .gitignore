@@ -51,3 +51,4 @@ mongod.log
 coverage/
 .nyc_output/
 env_vars/
+run.sh

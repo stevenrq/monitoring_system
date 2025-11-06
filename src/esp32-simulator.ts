@@ -2,7 +2,7 @@ import "./config/index";
 import WebSocket from "ws";
 import { SensorPayload } from "./interfaces/sensor-payload";
 
-const SIMULATION_INTERVAL_MS = 5000; // 5 segundos
+const SIMULATION_INTERVAL_MS = 300000; // 5 minutos
 const RAW = process.env.BACKEND_URL!; // p.ej. "http://34.227.8.130:3000"
 const SERVER_URL = RAW.replace(/^http/, "ws").replace(/\/?$/, "/"); // -> wss://.../ o ws://.../
 
