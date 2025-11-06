@@ -1708,7 +1708,7 @@
           "Reportes"
         ],
         "summary": "Reprocesa los promedios horarios en un rango específico",
-        "description": "Ejecuta nuevamente la canalización de agregación sobre lecturas crudas en el rango [from, to), opcionalmente filtrando por deviceId y/o sensorType. Requiere permisos de administrador (salvo que REPORTS_AUTH_DISABLED sea true) y responde con el detalle de filas recalculadas para que el frontend confirme la acción al operador.",
+        "description": "Ejecuta nuevamente la canalización de agregación sobre lecturas crudas en el rango [from, to), opcionalmente filtrando por deviceId y/o sensorType. Requiere permisos de administrador (salvo que REPORTS_AUTH_DISABLED sea true) y responde con el detalle de filas recalculadas para que el frontend confirme la acción al operador.\n\n**Qué hace:** vuelve a calcular los promedios, mínimos y máximos de cada hora usando las lecturas originales, para dejar los reportes al día cuando llegan datos atrasados o corregidos.\n**Qué debes enviar:** un JSON con las fechas `from` y `to` en formato ISO 8601 (máximo 92 días entre ellas) y, si quieres limitar el alcance, `deviceId` y/o `sensorType`.\n**Qué devuelve:** un mensaje de éxito junto con la cantidad de registros horarios actualizados (`upserted`), de modo que puedas confirmar la acción al usuario.",
         "security": [
           {
             "bearerAuth": []
