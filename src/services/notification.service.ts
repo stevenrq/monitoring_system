@@ -1,6 +1,5 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { SensorPayload } from "../interfaces/sensor-payload";
-import { toZonedISOString } from "../utils/timezone";
 
 interface Threshold {
   min?: number;
@@ -163,7 +162,7 @@ export const checkSensorDataForAlerts = (
     event: "sensorAlert",
     deviceId,
     message: alertMessage,
-    timestamp: toZonedISOString(new Date()),
+    timestamp: new Date().toISOString(),
   };
 
   // Enviar a todos los clientes conectados

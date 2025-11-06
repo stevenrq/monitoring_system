@@ -5,9 +5,8 @@ import HourlyAverageModel, {
   IHourlyAverage,
   IHourlyAverageDocument,
 } from "../models/hourly-average.model";
-import { DEFAULT_TIMEZONE } from "../utils/timezone";
 
-const REPORT_TIMEZONE = DEFAULT_TIMEZONE;
+const REPORT_TIMEZONE = "UTC";
 const HOURS_IN_DAY = 24;
 const MAX_HOURLY_RANGE_DAYS = 92;
 const DEFAULT_DECIMALS = 2;
@@ -42,7 +41,6 @@ export interface HourlyReportFilters {
   from?: Date;
   to?: Date;
   date?: Date;
-  timezone?: string;
   limit?: number;
   page?: number;
 }
@@ -125,9 +123,6 @@ const ensureRangeIsValid = (from: Date, to: Date) => {
   }
 };
 
-const getTimezone = (value?: string): string =>
-  value && value.trim().length > 0 ? value : REPORT_TIMEZONE;
-
 const buildHourlyAggregationPipeline = (
   params: UpsertHourlyParams
 ): PipelineStage[] => {
@@ -189,8 +184,8 @@ const buildHourlyAggregationPipeline = (
   ];
 };
 
-const toZonedISO = (value: Date, zone: string): string => {
-  const iso = DateTime.fromJSDate(value, { zone })
+const toUtcISO = (value: Date): string => {
+  const iso = DateTime.fromJSDate(value, { zone: REPORT_TIMEZONE })
     .set({ millisecond: 0 })
     .toISO({ suppressMilliseconds: true });
   if (!iso) {
@@ -199,8 +194,8 @@ const toZonedISO = (value: Date, zone: string): string => {
   return iso;
 };
 
-const computeRangeFromDate = (date: Date, zone: string) => {
-  const dt = DateTime.fromJSDate(date, { zone }).startOf("day");
+const computeRangeFromDate = (date: Date) => {
+  const dt = DateTime.fromJSDate(date, { zone: REPORT_TIMEZONE }).startOf("day");
   return {
     from: dt.toJSDate(),
     to: dt.plus({ days: 1 }).toJSDate(),
@@ -222,14 +217,12 @@ const normalizeHourlyFilters = (
   filters: HourlyReportFilters
 ): {
   query: FilterQuery<IHourlyAverageDocument>;
-  timezone: string;
   limit: number;
   skip: number;
   page: number;
   from?: Date;
   to?: Date;
 } => {
-  const timezone = getTimezone(filters.timezone);
   const query: FilterQuery<IHourlyAverageDocument> = {};
 
   if (filters.deviceId) {
@@ -244,7 +237,7 @@ const normalizeHourlyFilters = (
   let to: Date | undefined;
 
   if (filters.date) {
-    const range = computeRangeFromDate(filters.date, timezone);
+    const range = computeRangeFromDate(filters.date);
     from = range.from;
     to = range.to;
   } else if (filters.from && filters.to) {
@@ -265,7 +258,7 @@ const normalizeHourlyFilters = (
   const page = filters.page && filters.page > 0 ? filters.page : 1;
   const skip = (page - 1) * limit;
 
-  return { query, timezone, limit, skip, page, from, to };
+  return { query, limit, skip, page, from, to };
 };
 
 /**
@@ -349,8 +342,7 @@ export const explainHourlyAggregation = async (
 export const getHourlyReport = async (
   filters: HourlyReportFilters
 ): Promise<HourlyReportResult> => {
-  const { query, timezone, limit, skip, page } =
-    normalizeHourlyFilters(filters);
+  const { query, limit, skip, page } = normalizeHourlyFilters(filters);
 
   const [rawDocs, total] = await Promise.all([
     HourlyAverageModel.find(query)
@@ -367,7 +359,7 @@ export const getHourlyReport = async (
   const data = docs.map((doc) => ({
     deviceId: doc.deviceId,
     sensorType: doc.sensorType as SensorType,
-    hour: toZonedISO(doc.hour, timezone),
+    hour: toUtcISO(doc.hour),
     avg: roundNumber(doc.avg),
     min: roundNumber(doc.min),
     max: roundNumber(doc.max),
@@ -426,17 +418,14 @@ const markTemperatureExtremes = (
  * generando 24 filas (una por hora) y las métricas agregadas pedidas por negocio.
  *
  * @param deviceId - Identificador del dispositivo.
- * @param date - Fecha objetivo (se tomará la zona horaria configurada).
- * @param timezone - Zona horaria opcional, por defecto America/Bogota.
+ * @param date - Fecha objetivo (interpretada en UTC).
  * @returns El payload completo del reporte diario listo para la API.
  */
 export const getDailyReport = async (
   deviceId: string,
-  date: Date,
-  timezone?: string
+  date: Date
 ): Promise<DailyReportPayload> => {
-  const tz = getTimezone(timezone);
-  const { from, to } = computeRangeFromDate(date, tz);
+  const { from, to } = computeRangeFromDate(date);
 
   const rawDocs = await HourlyAverageModel.find({
     deviceId,
@@ -451,7 +440,7 @@ export const getDailyReport = async (
   const rows = initializeDailyRows();
 
   docs.forEach((doc) => {
-    const dt = DateTime.fromJSDate(doc.hour, { zone: tz });
+    const dt = DateTime.fromJSDate(doc.hour, { zone: REPORT_TIMEZONE });
     const hourIndex = dt.hour;
     const row = rows[hourIndex];
 
@@ -498,7 +487,7 @@ export const getDailyReport = async (
 
   return {
     deviceId,
-    date: DateTime.fromJSDate(from, { zone: tz })
+    date: DateTime.fromJSDate(from, { zone: REPORT_TIMEZONE })
       .startOf("day")
       .toISODate() as string,
     rows,
@@ -523,20 +512,16 @@ export const getDailyReport = async (
  * @param deviceId - Identificador del dispositivo.
  * @param year - Año numérico (YYYY).
  * @param month - Mes (1-12).
- * @param timezone - Zona horaria opcional, por defecto America/Bogota.
  * @returns El resumen mensual con una fila por día.
  */
 export const getMonthlyReport = async (
   deviceId: string,
   year: number,
-  month: number,
-  timezone?: string
+  month: number
 ): Promise<MonthlyReportPayload> => {
-  const tz = getTimezone(timezone);
-
   const startOfMonth = DateTime.fromObject(
     { year, month, day: 1 },
-    { zone: tz }
+    { zone: REPORT_TIMEZONE }
   ).startOf("day");
   const endOfMonth = startOfMonth.plus({ months: 1 });
 
@@ -557,7 +542,7 @@ export const getMonthlyReport = async (
   const dayBuckets = new Map<number, { [key in SensorType]?: number[] }>();
 
   docs.forEach((doc) => {
-    const dt = DateTime.fromJSDate(doc.hour, { zone: tz });
+    const dt = DateTime.fromJSDate(doc.hour, { zone: REPORT_TIMEZONE });
     const dayNumber = dt.day;
     if (!dayBuckets.has(dayNumber)) {
       dayBuckets.set(dayNumber, {});

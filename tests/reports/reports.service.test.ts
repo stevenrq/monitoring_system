@@ -7,7 +7,6 @@ import {
 } from "../../src/services/reports.service";
 import SensorDataModel from "../../src/models/sensor-data.model";
 import HourlyAverageModel from "../../src/models/hourly-average.model";
-import { DEFAULT_TIMEZONE } from "../../src/utils/timezone";
 
 jest.mock("../../src/models/sensor-data.model", () => {
   return {
@@ -33,6 +32,8 @@ const aggregateMock = SensorDataModel.aggregate as jest.Mock;
 const bulkWriteMock = HourlyAverageModel.bulkWrite as jest.Mock;
 const findMock = HourlyAverageModel.find as jest.Mock;
 const countDocumentsMock = HourlyAverageModel.countDocuments as jest.Mock;
+const UTC_ZONE = "utc";
+const UTC_TIMEZONE = "UTC";
 
 const buildQueryChain = (results: any[]) => {
   const exec = jest.fn().mockResolvedValue(results);
@@ -59,7 +60,7 @@ describe("reports.service", () => {
   describe("upsertHourlyAverages", () => {
     it("agrupa lecturas y realiza upsert sin duplicados", async () => {
       const hour = DateTime.fromISO("2025-11-02T07:00:00", {
-        zone: DEFAULT_TIMEZONE,
+        zone: UTC_ZONE,
       }).toJSDate();
 
       aggregateMock.mockResolvedValue([
@@ -98,7 +99,7 @@ describe("reports.service", () => {
             $addFields: expect.objectContaining({
               hour: expect.objectContaining({
                 $dateTrunc: expect.objectContaining({
-                  timezone: DEFAULT_TIMEZONE,
+                  timezone: UTC_TIMEZONE,
                 }),
               }),
             }),
@@ -139,7 +140,7 @@ describe("reports.service", () => {
   describe("getHourlyReport", () => {
     it("retorna métricas horarias paginadas con formato zonificado", async () => {
       const hour = DateTime.fromISO("2025-11-02T09:00:00", {
-        zone: DEFAULT_TIMEZONE,
+        zone: UTC_ZONE,
       }).toJSDate();
 
       const { chain } = buildQueryChain([
@@ -158,12 +159,12 @@ describe("reports.service", () => {
       countDocumentsMock.mockResolvedValueOnce(1);
 
       const from = DateTime.fromISO("2025-11-02T09:00:00", {
-        zone: DEFAULT_TIMEZONE,
+        zone: UTC_ZONE,
       })
         .minus({ hours: 1 })
         .toJSDate();
       const to = DateTime.fromISO("2025-11-02T09:00:00", {
-        zone: DEFAULT_TIMEZONE,
+        zone: UTC_ZONE,
       })
         .plus({ hours: 1 })
         .toJSDate();
@@ -173,7 +174,6 @@ describe("reports.service", () => {
         sensorType: "temperature",
         from,
         to,
-        timezone: DEFAULT_TIMEZONE,
         limit: 10,
         page: 1,
       });
@@ -188,7 +188,7 @@ describe("reports.service", () => {
         samples: 12,
         units: "°C",
       });
-      expect(result.data[0].hour).toBe("2025-11-02T09:00:00-05:00");
+      expect(result.data[0].hour).toBe("2025-11-02T09:00:00Z");
 
       expect(result.pagination).toEqual({
         total: 1,
@@ -202,7 +202,7 @@ describe("reports.service", () => {
   describe("getDailyReport", () => {
     it("calcula promedios diarios y marca Tmax/Tmin", async () => {
       const base = DateTime.fromISO("2025-11-02T00:00:00", {
-        zone: DEFAULT_TIMEZONE,
+        zone: UTC_ZONE,
       });
 
       const docs = [
@@ -271,11 +271,7 @@ describe("reports.service", () => {
       const { chain } = buildQueryChain(docs);
       findMock.mockReturnValueOnce(chain);
 
-      const report = await getDailyReport(
-        "ESP32_1",
-        base.toJSDate(),
-        DEFAULT_TIMEZONE
-      );
+      const report = await getDailyReport("ESP32_1", base.toJSDate());
 
       expect(report.rows[0]).toMatchObject({
         hour: 0,
@@ -313,7 +309,7 @@ describe("reports.service", () => {
   describe("getMonthlyReport", () => {
     it("resume métricas por día", async () => {
       const base = DateTime.fromISO("2025-11-01T00:00:00", {
-        zone: DEFAULT_TIMEZONE,
+        zone: UTC_ZONE,
       });
 
       const docs = [
@@ -362,12 +358,7 @@ describe("reports.service", () => {
       const { chain } = buildQueryChain(docs);
       findMock.mockReturnValueOnce(chain);
 
-      const report = await getMonthlyReport(
-        "ESP32_1",
-        2025,
-        11,
-        DEFAULT_TIMEZONE
-      );
+      const report = await getMonthlyReport("ESP32_1", 2025, 11);
 
       expect(report.days.find((day) => day.day === 1)).toMatchObject({
         Tmax: 22,

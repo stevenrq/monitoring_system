@@ -1,5 +1,4 @@
 import { Document, model, Schema } from "mongoose";
-import { DEFAULT_TIMEZONE, toZonedISOString } from "../utils/timezone";
 
 export interface ISensorDataDocument extends Document {
   /**
@@ -18,7 +17,6 @@ export interface ISensorDataDocument extends Document {
    */
   unit: string;
   timestamp: Date;
-  timestampLocal: string;
 }
 
 const SensorDataSchema = new Schema<ISensorDataDocument>({
@@ -27,47 +25,34 @@ const SensorDataSchema = new Schema<ISensorDataDocument>({
   value: { type: Number, required: true },
   unit: { type: String, required: true },
   timestamp: { type: Date, default: Date.now, index: true },
-  timestampLocal: {
-    type: String,
-    required: true,
-    index: true,
-    default: function (this: ISensorDataDocument) {
-      const source = this.timestamp || new Date();
-      return toZonedISOString(source, DEFAULT_TIMEZONE);
-    },
-  },
 });
 
 // Índice compuesto para optimizar consultas por dispositivo, tipo de sensor y tiempo
 SensorDataSchema.index({ deviceId: 1, sensorType: 1, timestamp: -1 });
 
 SensorDataSchema.pre("validate", function (next) {
-  if (this.timestamp) {
-    this.timestampLocal = toZonedISOString(this.timestamp, DEFAULT_TIMEZONE);
-  } else if (this.timestampLocal) {
-    this.timestamp = new Date(this.timestampLocal);
-  } else {
-    const now = new Date();
-    this.timestamp = now;
-    this.timestampLocal = toZonedISOString(now, DEFAULT_TIMEZONE);
+  const doc = this as ISensorDataDocument & {
+    timestamp?: Date | string;
+  };
+
+  if (doc.timestamp && !(doc.timestamp instanceof Date)) {
+    const parsed = new Date(doc.timestamp);
+    if (!Number.isNaN(parsed.getTime())) {
+      doc.timestamp = parsed;
+    }
   }
   next();
 });
 
 SensorDataSchema.set("toJSON", {
   transform: (_doc, ret: any) => {
-    if (ret.timestamp instanceof Date || typeof ret.timestamp === "string") {
-      const source =
-        ret.timestamp instanceof Date
-          ? ret.timestamp
-          : new Date(ret.timestamp);
-      const local =
-        typeof ret.timestampLocal === "string"
-          ? ret.timestampLocal
-          : toZonedISOString(source, DEFAULT_TIMEZONE);
-
-      ret.timestampUtc = source.toISOString();
-      ret.timestamp = local;
+    if (ret.timestamp instanceof Date) {
+      ret.timestamp = ret.timestamp.toISOString();
+    } else if (typeof ret.timestamp === "string") {
+      const parsed = new Date(ret.timestamp);
+      if (!Number.isNaN(parsed.getTime())) {
+        ret.timestamp = parsed.toISOString();
+      }
     }
     return ret;
   },

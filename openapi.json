@@ -58,6 +58,10 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/CredencialesLogin"
+              },
+              "example": {
+                "username": "stevenrq8",
+                "password": "stevenrq8"
               }
             }
           }
@@ -141,6 +145,9 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/SolicitudOlvidoPassword"
+              },
+              "example": {
+                "email": "stevenrq8@gmail.com"
               }
             }
           }
@@ -187,6 +194,10 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/SolicitudCambioPassword"
+              },
+              "example": {
+                "oldPassword": "stevenrq8",
+                "newPassword": "CambioSeguro2025"
               }
             }
           }
@@ -301,6 +312,15 @@
                   "username",
                   "password"
                 ]
+              },
+              "example": {
+                "name": "Steven",
+                "lastName": "Ricardo Quiñones",
+                "phone": 3207108160,
+                "email": "stevenrq8@gmail.com",
+                "username": "stevenrq8",
+                "password": "stevenrq8",
+                "role": "admin"
               }
             }
           }
@@ -379,6 +399,15 @@
                   "username",
                   "password"
                 ]
+              },
+              "example": {
+                "name": "Ana",
+                "lastName": "López",
+                "phone": 3207108160,
+                "email": "ana.lopez@example.com",
+                "username": "ana.lopez",
+                "password": "Sensor123!",
+                "role": "user"
               }
             }
           }
@@ -568,6 +597,15 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/UsuarioBase"
+              },
+              "example": {
+                "name": "Ana",
+                "lastName": "López",
+                "phone": 3207108160,
+                "email": "ana.lopez@example.com",
+                "username": "ana.lopez",
+                "password": "Sensor123!",
+                "role": "user"
               }
             }
           }
@@ -709,6 +747,26 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/PlantaBase"
+              },
+              "example": {
+                "name": "Tomate Cherry",
+                "deviceId": "ESP32_1",
+                "thresholds": {
+                  "temperature": {
+                    "min": 18,
+                    "max": 28
+                  },
+                  "humidity": {
+                    "min": 45,
+                    "max": 80
+                  },
+                  "soil_humidity": {
+                    "min": 20
+                  },
+                  "solar_radiation": {
+                    "max": 900
+                  }
+                }
               }
             }
           }
@@ -908,6 +966,26 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/PlantaBase"
+              },
+              "example": {
+                "name": "Tomate Cherry",
+                "deviceId": "ESP32_1",
+                "thresholds": {
+                  "temperature": {
+                    "min": 18,
+                    "max": 28
+                  },
+                  "humidity": {
+                    "min": 45,
+                    "max": 80
+                  },
+                  "soil_humidity": {
+                    "min": 20
+                  },
+                  "solar_radiation": {
+                    "max": 900
+                  }
+                }
               }
             }
           }
@@ -1046,7 +1124,7 @@
           "Sensores"
         ],
         "summary": "Obtiene la última lectura consolidada por sensor",
-        "description": "Agrupa las lecturas crudas por deviceId y sensorType para devolver el último valor registrado, junto con unidades y timestamps en zona local y UTC. Acepta filtrar por deviceId para limitar la respuesta a un equipo y sirve para tarjetas tipo \"estado actual\" en el dashboard.",
+        "description": "Agrupa las lecturas crudas por deviceId y sensorType para devolver el último valor registrado, junto con unidades y timestamps en formato ISO 8601 (UTC). Acepta filtrar por deviceId para limitar la respuesta a un equipo y sirve para tarjetas tipo \"estado actual\" en el dashboard.",
         "parameters": [
           {
             "in": "query",
@@ -1056,7 +1134,7 @@
               "type": "string"
             },
             "description": "ID del dispositivo a filtrar. Si no se envía, se muestran todos los dispositivos.",
-            "example": "ESP32_01"
+            "example": "ESP32_1"
           }
         ],
         "responses": {
@@ -1072,18 +1150,32 @@
                 },
                 "example": [
                   {
-                    "deviceId": "ESP32_01",
+                    "deviceId": "ESP32_1",
                     "sensorType": "temperature",
                     "value": 26.4,
                     "unit": "°C",
                     "timestamp": "2025-11-02T10:15:32.000Z"
                   },
                   {
-                    "deviceId": "ESP32_01",
+                    "deviceId": "ESP32_1",
                     "sensorType": "humidity",
                     "value": 61.8,
                     "unit": "%",
-                    "timestamp": "2025-11-02T10:15:31.000Z"
+                    "timestamp": "2025-11-02T10:15:32.000Z"
+                  },
+                  {
+                    "deviceId": "ESP32_1",
+                    "sensorType": "soil_humidity",
+                    "value": 42.3,
+                    "unit": "%",
+                    "timestamp": "2025-11-02T10:15:32.000Z"
+                  },
+                  {
+                    "deviceId": "ESP32_1",
+                    "sensorType": "solar_radiation",
+                    "value": 512,
+                    "unit": "W/m²",
+                    "timestamp": "2025-11-02T10:15:32.000Z"
                   }
                 ]
               }
@@ -1121,7 +1213,7 @@
             },
             "required": false,
             "description": "Filtra solo por un dispositivo específico.",
-            "example": "ESP32_02"
+            "example": "ESP32_1"
           },
           {
             "in": "query",
@@ -1141,7 +1233,7 @@
               "format": "date-time"
             },
             "description": "Fecha inicial del rango (incluyente). Debe ser un ISO string.",
-            "example": "2025-11-01T00:00:00.000Z"
+            "example": "2025-11-02T00:00:00Z"
           },
           {
             "in": "query",
@@ -1151,7 +1243,7 @@
               "format": "date-time"
             },
             "description": "Fecha final del rango (incluyente).",
-            "example": "2025-11-02T23:59:59.000Z"
+            "example": "2025-11-03T00:00:00Z"
           }
         ],
         "responses": {
@@ -1167,16 +1259,28 @@
                 },
                 "example": [
                   {
-                    "deviceId": "ESP32_01",
+                    "deviceId": "ESP32_1",
                     "sensorType": "temperature",
                     "unit": "°C",
-                    "samples": 280,
-                    "minValue": 22.1,
-                    "maxValue": 32.8,
-                    "averageValue": 26.9,
-                    "firstTimestamp": "2025-11-01T10:00:00.000Z",
-                    "lastTimestamp": "2025-11-02T14:30:00.000Z",
-                    "latestValue": 27.3
+                    "samples": 96,
+                    "minValue": 18.2,
+                    "maxValue": 28.4,
+                    "averageValue": 23.7,
+                    "firstTimestamp": "2025-11-02T00:00:00Z",
+                    "lastTimestamp": "2025-11-02T12:00:00Z",
+                    "latestValue": 24.1
+                  },
+                  {
+                    "deviceId": "ESP32_1",
+                    "sensorType": "humidity",
+                    "unit": "%",
+                    "samples": 96,
+                    "minValue": 48.9,
+                    "maxValue": 72.4,
+                    "averageValue": 58.6,
+                    "firstTimestamp": "2025-11-02T00:00:00Z",
+                    "lastTimestamp": "2025-11-02T12:00:00Z",
+                    "latestValue": 57.8
                   }
                 ]
               }
@@ -1214,7 +1318,7 @@
             },
             "required": false,
             "description": "Filtra por dispositivo.",
-            "example": "ESP32_01"
+            "example": "ESP32_1"
           },
           {
             "in": "query",
@@ -1235,7 +1339,7 @@
             },
             "required": false,
             "description": "Fecha inicial del rango (incluyente).",
-            "example": "2025-11-02T10:00:00.000Z"
+            "example": "2025-11-02T08:00:00Z"
           },
           {
             "in": "query",
@@ -1246,7 +1350,7 @@
             },
             "required": false,
             "description": "Fecha final del rango (incluyente).",
-            "example": "2025-11-02T14:00:00.000Z"
+            "example": "2025-11-02T12:00:00Z"
           },
           {
             "in": "query",
@@ -1275,19 +1379,27 @@
                 "example": [
                   {
                     "_id": "672646217d3d56b6e8c4e130",
-                    "deviceId": "ESP32_01",
+                    "deviceId": "ESP32_1",
                     "sensorType": "temperature",
                     "value": 27.21,
                     "unit": "°C",
-                    "timestamp": "2025-11-02T14:30:15.543Z"
+                    "timestamp": "2025-11-02T10:30:15.543Z"
                   },
                   {
                     "_id": "672646217d3d56b6e8c4e131",
-                    "deviceId": "ESP32_01",
-                    "sensorType": "temperature",
-                    "value": 27.19,
-                    "unit": "°C",
-                    "timestamp": "2025-11-02T14:29:15.543Z"
+                    "deviceId": "ESP32_1",
+                    "sensorType": "humidity",
+                    "value": 59.4,
+                    "unit": "%",
+                    "timestamp": "2025-11-02T10:29:45.102Z"
+                  },
+                  {
+                    "_id": "672646217d3d56b6e8c4e132",
+                    "deviceId": "ESP32_1",
+                    "sensorType": "solar_radiation",
+                    "value": 498,
+                    "unit": "W/m²",
+                    "timestamp": "2025-11-02T10:29:15.018Z"
                   }
                 ]
               }
@@ -1329,7 +1441,8 @@
             "schema": {
               "type": "string"
             },
-            "description": "Identificador del dispositivo a filtrar."
+            "description": "Identificador del dispositivo a filtrar.",
+            "example": "ESP32_1"
           },
           {
             "name": "sensorType",
@@ -1344,7 +1457,8 @@
                 "solar_radiation"
               ]
             },
-            "description": "Tipo de sensor a filtrar."
+            "description": "Tipo de sensor a filtrar.",
+            "example": "temperature"
           },
           {
             "name": "date",
@@ -1354,7 +1468,8 @@
               "type": "string",
               "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
             },
-            "description": "Fecha (YYYY-MM-DD) para recuperar las 24 horas del día."
+            "description": "Fecha (YYYY-MM-DD) para recuperar las 24 horas del día.",
+            "example": "2025-11-02"
           },
           {
             "name": "from",
@@ -1364,7 +1479,8 @@
               "type": "string",
               "format": "date-time"
             },
-            "description": "Fecha/hora inicial (ISO 8601). Debe usarse junto con 'to'."
+            "description": "Fecha/hora inicial (ISO 8601). Debe usarse junto con 'to'.",
+            "example": "2025-11-02T00:00:00Z"
           },
           {
             "name": "to",
@@ -1374,16 +1490,8 @@
               "type": "string",
               "format": "date-time"
             },
-            "description": "Fecha/hora final (ISO 8601). Debe usarse junto con 'from'."
-          },
-          {
-            "name": "timezone",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Zona horaria IANA utilizada para formatear la columna 'hour'. Por defecto: America/Bogota."
+            "description": "Fecha/hora final (ISO 8601). Debe usarse junto con 'from'.",
+            "example": "2025-11-03T00:00:00Z"
           },
           {
             "name": "limit",
@@ -1394,7 +1502,8 @@
               "minimum": 1,
               "maximum": 2000
             },
-            "description": "Cantidad máxima de filas por página. Por defecto 500."
+            "description": "Cantidad máxima de filas por página. Por defecto 500.",
+            "example": 500
           },
           {
             "name": "page",
@@ -1404,7 +1513,8 @@
               "type": "integer",
               "minimum": 1
             },
-            "description": "Número de página a recuperar. Por defecto 1."
+            "description": "Número de página a recuperar. Por defecto 1.",
+            "example": 1
           }
         ],
         "responses": {
@@ -1447,7 +1557,7 @@
           "Reportes"
         ],
         "summary": "Construye el reporte diario de 24 horas",
-        "description": "Ensambla un resumen con 24 filas (una por hora) y métricas globales del día solicitado: extremos de temperatura, humedad promedio y energía solar. Requiere deviceId y date (YYYY-MM-DD) y respeta la zona horaria solicitada para formatear la respuesta.",
+        "description": "Ensambla un resumen con 24 filas (una por hora) y métricas globales del día solicitado: extremos de temperatura, humedad promedio y energía solar. Requiere deviceId y date (YYYY-MM-DD) y todas las fechas devueltas están en formato ISO 8601 (UTC).",
         "security": [
           {
             "bearerAuth": []
@@ -1461,7 +1571,8 @@
             "schema": {
               "type": "string"
             },
-            "description": "Identificador del dispositivo que se desea consultar."
+            "description": "Identificador del dispositivo que se desea consultar.",
+            "example": "ESP32_1"
           },
           {
             "name": "date",
@@ -1471,16 +1582,8 @@
               "type": "string",
               "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
             },
-            "description": "Día a consultar en formato YYYY-MM-DD."
-          },
-          {
-            "name": "timezone",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Zona horaria para interpretar y formatear el día. Por defecto America/Bogota."
+            "description": "Día a consultar en formato YYYY-MM-DD.",
+            "example": "2025-11-02"
           }
         ],
         "responses": {
@@ -1537,7 +1640,8 @@
             "schema": {
               "type": "string"
             },
-            "description": "Identificador del dispositivo que se desea consultar."
+            "description": "Identificador del dispositivo que se desea consultar.",
+            "example": "ESP32_1"
           },
           {
             "name": "year",
@@ -1548,7 +1652,8 @@
               "minimum": 2000,
               "maximum": 2100
             },
-            "description": "Año en formato YYYY."
+            "description": "Año en formato YYYY.",
+            "example": 2025
           },
           {
             "name": "month",
@@ -1559,16 +1664,8 @@
               "minimum": 1,
               "maximum": 12
             },
-            "description": "Mes numérico (1-12)."
-          },
-          {
-            "name": "timezone",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Zona horaria para interpretar el mes. Por defecto America/Bogota."
+            "description": "Mes numérico (1-12).",
+            "example": 11
           }
         ],
         "responses": {
@@ -1623,6 +1720,12 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/HourlyRecalculateRequest"
+              },
+              "example": {
+                "deviceId": "ESP32_1",
+                "sensorType": "temperature",
+                "from": "2025-11-02T00:00:00Z",
+                "to": "2025-11-03T00:00:00Z"
               }
             }
           }
@@ -1641,7 +1744,7 @@
                     },
                     "upserted": {
                       "type": "integer",
-                      "example": 48
+                      "example": 24
                     }
                   }
                 }
@@ -1697,12 +1800,12 @@
         "properties": {
           "username": {
             "type": "string",
-            "example": "admin",
+            "example": "stevenrq8",
             "description": "Nombre de usuario registrado."
           },
           "password": {
             "type": "string",
-            "example": "ContraseñaSegura123",
+            "example": "stevenrq8",
             "description": "Contraseña correspondiente al usuario."
           }
         }
@@ -1733,7 +1836,7 @@
           "email": {
             "type": "string",
             "format": "email",
-            "example": "usuario@correo.com",
+            "example": "stevenrq8@gmail.com",
             "description": "Correo electrónico asociado a la cuenta cuya contraseña se desea restablecer."
           }
         }
@@ -1747,12 +1850,12 @@
         "properties": {
           "oldPassword": {
             "type": "string",
-            "example": "ContraseñaActual123",
+            "example": "stevenrq8",
             "description": "Contraseña actual del usuario."
           },
           "newPassword": {
             "type": "string",
-            "example": "NuevaContraseñaSegura456",
+            "example": "CambioSeguro2025",
             "description": "Nueva contraseña que sustituirá a la contraseña actual."
           }
         }
@@ -1762,33 +1865,33 @@
         "properties": {
           "name": {
             "type": "string",
-            "example": "María",
+            "example": "Ana",
             "description": "Nombre del usuario."
           },
           "lastName": {
             "type": "string",
-            "example": "García",
+            "example": "López",
             "description": "Apellido del usuario."
           },
           "phone": {
             "type": "number",
-            "example": 5551234567,
+            "example": 3207108160,
             "description": "Número telefónico de 10 dígitos."
           },
           "email": {
             "type": "string",
             "format": "email",
-            "example": "maria.garcia@correo.com",
+            "example": "ana.lopez@example.com",
             "description": "Correo electrónico único."
           },
           "username": {
             "type": "string",
-            "example": "maria.garcia",
+            "example": "ana.lopez",
             "description": "Nombre de usuario único."
           },
           "password": {
             "type": "string",
-            "example": "ContraseñaSegura123",
+            "example": "Sensor123!",
             "description": "Contraseña con mínimo 6 caracteres."
           },
           "role": {
@@ -1803,27 +1906,62 @@
         }
       },
       "UsuarioRespuesta": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/UsuarioBase"
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "example": "67263f2b8b8876d3b5a41001"
           },
-          {
-            "type": "object",
-            "properties": {
-              "_id": {
-                "type": "string",
-                "example": "64f0c2e03f0c4d0021a4b57d"
-              },
-              "createdAt": {
-                "type": "string",
-                "format": "date-time"
-              },
-              "updatedAt": {
-                "type": "string",
-                "format": "date-time"
-              }
-            }
+          "name": {
+            "type": "string",
+            "example": "Ana"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "López"
+          },
+          "phone": {
+            "type": "number",
+            "example": 3207108160
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "ana.lopez@example.com"
+          },
+          "username": {
+            "type": "string",
+            "example": "ana.lopez"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "admin"
+            ],
+            "example": "user"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-10-30T14:05:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-10-30T14:05:00.000Z"
           }
+        },
+        "required": [
+          "_id",
+          "name",
+          "lastName",
+          "phone",
+          "email",
+          "username",
+          "role",
+          "createdAt",
+          "updatedAt"
         ]
       },
       "UsuarioRespuestaConMensaje": {
@@ -1835,6 +1973,20 @@
           },
           "user": {
             "$ref": "#/components/schemas/UsuarioRespuesta"
+          }
+        },
+        "example": {
+          "message": "Usuario creado exitosamente",
+          "user": {
+            "_id": "67263f2b8b8876d3b5a41001",
+            "name": "Ana",
+            "lastName": "López",
+            "phone": 3207108160,
+            "email": "ana.lopez@example.com",
+            "username": "ana.lopez",
+            "role": "user",
+            "createdAt": "2025-10-30T14:05:00.000Z",
+            "updatedAt": "2025-10-30T14:05:00.000Z"
           }
         }
       },
@@ -1867,7 +2019,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "example": "Helecho de Boston",
+            "example": "Tomate Cherry",
             "description": "Nombre de la planta."
           },
           "thresholds": {
@@ -1904,15 +2056,40 @@
                 "max": 28
               },
               "humidity": {
-                "min": 40,
-                "max": 75
+                "min": 45,
+                "max": 80
               },
               "soil_humidity": {
                 "min": 20
               },
               "solar_radiation": {
-                "max": 950
+                "max": 900
               }
+            }
+          },
+          "deviceId": {
+            "type": "string",
+            "description": "Identificador del dispositivo físico que reporta los sensores.",
+            "example": "ESP32_1"
+          }
+        },
+        "example": {
+          "name": "Tomate Cherry",
+          "deviceId": "ESP32_1",
+          "thresholds": {
+            "temperature": {
+              "min": 18,
+              "max": 28
+            },
+            "humidity": {
+              "min": 45,
+              "max": 80
+            },
+            "soil_humidity": {
+              "min": 20
+            },
+            "solar_radiation": {
+              "max": 900
             }
           }
         }
@@ -1941,13 +2118,13 @@
           }
         ],
         "example": {
-          "_id": "64f0c3413f0c4d0021a4b580",
-          "deviceId": "ESP32_1",
+          "_id": "67263f3d8b8876d3b5a41010",
           "name": "Tomate Cherry",
+          "deviceId": "ESP32_1",
           "thresholds": {
             "temperature": {
               "min": 18,
-              "max": 30
+              "max": 28
             },
             "humidity": {
               "min": 45,
@@ -1960,8 +2137,8 @@
               "max": 900
             }
           },
-          "createdAt": "2024-05-21T15:12:30.123Z",
-          "updatedAt": "2024-05-21T15:12:30.123Z"
+          "createdAt": "2025-10-30T14:05:00.000Z",
+          "updatedAt": "2025-11-02T09:00:00.000Z"
         }
       },
       "LecturaSensor": {
@@ -1969,11 +2146,11 @@
         "properties": {
           "deviceId": {
             "type": "string",
-            "example": "ESP32-001"
+            "example": "ESP32_1"
           },
           "sensorType": {
             "type": "string",
-            "example": "temperatura"
+            "example": "temperature"
           },
           "value": {
             "type": "number",
@@ -1985,7 +2162,8 @@
           },
           "timestamp": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "example": "2025-11-02T10:15:32.000Z"
           }
         }
       },
@@ -1994,43 +2172,45 @@
         "properties": {
           "deviceId": {
             "type": "string",
-            "example": "ESP32-001"
+            "example": "ESP32_1"
           },
           "sensorType": {
             "type": "string",
-            "example": "humedad"
+            "example": "temperature"
           },
           "unit": {
             "type": "string",
-            "example": "%"
+            "example": "°C"
           },
           "samples": {
             "type": "integer",
-            "example": 120
+            "example": 96
           },
           "minValue": {
             "type": "number",
-            "example": 40.1
+            "example": 18.2
           },
           "maxValue": {
             "type": "number",
-            "example": 68.3
+            "example": 28.4
           },
           "averageValue": {
             "type": "number",
-            "example": 55.2
+            "example": 23.7
           },
           "firstTimestamp": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "example": "2025-11-02T00:00:00Z"
           },
           "lastTimestamp": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "example": "2025-11-02T12:00:00Z"
           },
           "latestValue": {
             "type": "number",
-            "example": 60.5
+            "example": 24.1
           }
         }
       },
@@ -2069,19 +2249,19 @@
           },
           "hour": {
             "type": "string",
-            "example": "2025-11-02T09:00:00-05:00"
+            "example": "2025-11-02T09:00:00Z"
           },
           "avg": {
             "type": "number",
-            "example": 22.4
+            "example": 22.3
           },
           "min": {
             "type": "number",
-            "example": 20.1
+            "example": 21.8
           },
           "max": {
             "type": "number",
-            "example": 24.9
+            "example": 23.1
           },
           "samples": {
             "type": "integer",
@@ -2098,11 +2278,11 @@
         "properties": {
           "total": {
             "type": "integer",
-            "example": 96
+            "example": 2
           },
           "limit": {
             "type": "integer",
-            "example": 50
+            "example": 500
           },
           "page": {
             "type": "integer",
@@ -2110,7 +2290,7 @@
           },
           "pages": {
             "type": "integer",
-            "example": 2
+            "example": 1
           }
         }
       },
@@ -2132,16 +2312,26 @@
             {
               "deviceId": "ESP32_1",
               "sensorType": "temperature",
-              "hour": "2025-11-06T12:00:00-05:00",
-              "avg": 29.9,
-              "min": 10.47,
-              "max": 49.87,
-              "samples": 111,
+              "hour": "2025-11-02T09:00:00Z",
+              "avg": 22.3,
+              "min": 21.8,
+              "max": 23.1,
+              "samples": 12,
               "units": "°C"
+            },
+            {
+              "deviceId": "ESP32_1",
+              "sensorType": "humidity",
+              "hour": "2025-11-02T09:00:00Z",
+              "avg": 58.4,
+              "min": 55.1,
+              "max": 60.2,
+              "samples": 12,
+              "units": "%"
             }
           ],
           "pagination": {
-            "total": 1,
+            "total": 2,
             "limit": 500,
             "page": 1,
             "pages": 1
@@ -2182,6 +2372,12 @@
             "nullable": true,
             "example": false
           }
+        },
+        "example": {
+          "hour": 0,
+          "temperature_avg": 20.0,
+          "humidity_avg": 60.0,
+          "solar_radiation_avg": 450
         }
       },
       "DailyReportTemperatureSummary": {
@@ -2190,17 +2386,17 @@
           "tmax": {
             "type": "number",
             "nullable": true,
-            "example": 30.5
+            "example": 27.0
           },
           "tmin": {
             "type": "number",
             "nullable": true,
-            "example": 18.2
+            "example": 18.0
           },
           "tpro": {
             "type": "number",
             "nullable": true,
-            "example": 24.6
+            "example": 21.67
           }
         }
       },
@@ -2210,7 +2406,7 @@
           "hpro": {
             "type": "number",
             "nullable": true,
-            "example": 63.2
+            "example": 60.0
           }
         }
       },
@@ -2220,17 +2416,17 @@
           "radTot": {
             "type": "number",
             "nullable": true,
-            "example": 4860
+            "example": 950
           },
           "radPro": {
             "type": "number",
             "nullable": true,
-            "example": 405
+            "example": 475
           },
           "radMax": {
             "type": "number",
             "nullable": true,
-            "example": 710
+            "example": 500
           }
         }
       },
@@ -2263,16 +2459,24 @@
         },
         "example": {
           "deviceId": "ESP32_1",
-          "date": "2025-11-06",
+          "date": "2025-11-02",
           "rows": [
             {
-              "hour": 0
+              "hour": 0,
+              "temperature_avg": 20.0,
+              "humidity_avg": 60.0,
+              "solar_radiation_avg": 450
             },
             {
-              "hour": 1
+              "hour": 1,
+              "temperature_avg": 27.0,
+              "solar_radiation_avg": 500,
+              "isTmax": true
             },
             {
-              "hour": 2
+              "hour": 2,
+              "temperature_avg": 18.0,
+              "isTmin": true
             },
             {
               "hour": 3
@@ -2302,12 +2506,7 @@
               "hour": 11
             },
             {
-              "hour": 12,
-              "humidity_avg": 78.65,
-              "solar_radiation_avg": 626.23,
-              "temperature_avg": 29.9,
-              "isTmax": true,
-              "isTmin": true
+              "hour": 12
             },
             {
               "hour": 13
@@ -2344,17 +2543,17 @@
             }
           ],
           "temperature": {
-            "tmax": 29.9,
-            "tmin": 29.9,
-            "tpro": 29.9
+            "tmax": 27.0,
+            "tmin": 18.0,
+            "tpro": 21.67
           },
           "humidity": {
-            "hpro": 78.65
+            "hpro": 60.0
           },
           "radiation": {
-            "radTot": 626.23,
-            "radPro": 626.23,
-            "radMax": 626.23
+            "radTot": 950,
+            "radPro": 475,
+            "radMax": 500
           }
         }
       },
@@ -2402,6 +2601,16 @@
             "nullable": true,
             "example": 23.1
           }
+        },
+        "example": {
+          "day": 1,
+          "RadTot": 480,
+          "RadPro": 320,
+          "RadMax": 520,
+          "HR": 65,
+          "Tmax": 22,
+          "Tmin": 18,
+          "Tpro": 20.5
         }
       },
       "MonthlyReportResponse": {
@@ -2432,101 +2641,24 @@
           "month": 11,
           "days": [
             {
-              "day": 1
+              "day": 1,
+              "RadTot": 480,
+              "RadPro": 320,
+              "RadMax": 520,
+              "HR": 65,
+              "Tmax": 22,
+              "Tmin": 18,
+              "Tpro": 20.5
             },
             {
-              "day": 2
-            },
-            {
-              "day": 3
-            },
-            {
-              "day": 4
-            },
-            {
-              "day": 5
-            },
-            {
-              "day": 6,
-              "RadTot": 626.23,
-              "RadPro": 626.23,
-              "RadMax": 626.23,
-              "HR": 78.65,
-              "Tmax": 29.9,
-              "Tmin": 29.9,
-              "Tpro": 29.9
-            },
-            {
-              "day": 7
-            },
-            {
-              "day": 8
-            },
-            {
-              "day": 9
-            },
-            {
-              "day": 10
-            },
-            {
-              "day": 11
-            },
-            {
-              "day": 12
-            },
-            {
-              "day": 13
-            },
-            {
-              "day": 14
-            },
-            {
-              "day": 15
-            },
-            {
-              "day": 16
-            },
-            {
-              "day": 17
-            },
-            {
-              "day": 18
-            },
-            {
-              "day": 19
-            },
-            {
-              "day": 20
-            },
-            {
-              "day": 21
-            },
-            {
-              "day": 22
-            },
-            {
-              "day": 23
-            },
-            {
-              "day": 24
-            },
-            {
-              "day": 25
-            },
-            {
-              "day": 26
-            },
-            {
-              "day": 27
-            },
-            {
-              "day": 28
-            },
-            {
-              "day": 29
-            },
-            {
-              "day": 30
+              "day": 2,
+              "RadTot": 600,
+              "RadPro": 600,
+              "RadMax": 600,
+              "HR": 70,
+              "Tmax": 25,
+              "Tmin": 21,
+              "Tpro": 23.5
             }
           ]
         }
@@ -2557,25 +2689,19 @@
           "from": {
             "type": "string",
             "format": "date-time",
-            "example": "2025-11-02T00:00:00-05:00"
+            "example": "2025-11-02T00:00:00Z"
           },
           "to": {
             "type": "string",
             "format": "date-time",
-            "example": "2025-11-03T00:00:00-05:00"
-          },
-          "timezone": {
-            "type": "string",
-            "nullable": true,
-            "example": "America/Bogota"
+            "example": "2025-11-03T00:00:00Z"
           }
         },
         "example": {
           "deviceId": "ESP32_1",
           "sensorType": "temperature",
-          "from": "2025-11-02T00:00:00-05:00",
-          "to": "2025-11-03T00:00:00-05:00",
-          "timezone": "America/Bogota"
+          "from": "2025-11-02T00:00:00Z",
+          "to": "2025-11-03T00:00:00Z"
         }
       },
       "MensajeRespuesta": {

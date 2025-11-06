@@ -1,6 +1,6 @@
 # Reports
 
-Servicio responsable de materializar promedios horarios y exponer reportes diarios/mensuales para los dispositivos IoT. Todas las agregaciones respetan la zona horaria `America/Bogota` y se basan en los documentos de la colección `sensor_readings`.
+Servicio responsable de materializar promedios horarios y exponer reportes diarios/mensuales para los dispositivos IoT. Todas las agregaciones y respuestas operan en UTC y se basan en los documentos de la colección `sensor_readings`.
 
 ## Colecciones derivadas
 
@@ -19,15 +19,25 @@ Base path: `/api/reports`
       {
         "deviceId": "ESP32_1",
         "sensorType": "temperature",
-        "hour": "2025-11-02T09:00:00-05:00",
-        "avg": 22.1,
-        "min": 20.9,
-        "max": 23.4,
+        "hour": "2025-11-02T09:00:00Z",
+        "avg": 22.3,
+        "min": 21.8,
+        "max": 23.1,
         "samples": 12,
         "units": "°C"
+      },
+      {
+        "deviceId": "ESP32_1",
+        "sensorType": "humidity",
+        "hour": "2025-11-02T09:00:00Z",
+        "avg": 58.4,
+        "min": 55.1,
+        "max": 60.2,
+        "samples": 12,
+        "units": "%"
       }
     ],
-    "pagination": { "total": 120, "limit": 50, "page": 1, "pages": 3 }
+    "pagination": { "total": 2, "limit": 500, "page": 1, "pages": 1 }
   }
   ```
 
@@ -39,23 +49,40 @@ Base path: `/api/reports`
     "rows": [
       {
         "hour": 0,
-        "solar_radiation_avg": 420,
-        "humidity_avg": 58,
-        "temperature_avg": 21.6
+        "temperature_avg": 20,
+        "humidity_avg": 60,
+        "solar_radiation_avg": 450
       },
       {
-        "hour": 13,
-        "temperature_avg": 29.4,
+        "hour": 1,
+        "temperature_avg": 27,
+        "solar_radiation_avg": 500,
         "isTmax": true
+      },
+      {
+        "hour": 2,
+        "temperature_avg": 18,
+        "isTmin": true
       }
     ],
-    "temperature": { "tmax": 29.4, "tmin": 18.1, "tpro": 23.7 },
-    "humidity": { "hpro": 61.5 },
-    "radiation": { "radTot": 4650, "radPro": 387.5, "radMax": 710 }
+    "temperature": { "tmax": 27, "tmin": 18, "tpro": 21.67 },
+    "humidity": { "hpro": 60 },
+    "radiation": { "radTot": 950, "radPro": 475, "radMax": 500 }
   }
   ```
 
-- `GET /monthly`: requiere `deviceId`, `year`, `month`. Devuelve una fila por día con las métricas agregadas (`Tmax`, `Tmin`, `Tpro`, `HR`, `RadTot`, `RadPro`, `RadMax`).
+- `GET /monthly`: requiere `deviceId`, `year`, `month`. Devuelve una fila por día con las métricas agregadas (`Tmax`, `Tmin`, `Tpro`, `HR`, `RadTot`, `RadPro`, `RadMax`). Ejemplo:
+  ```json
+  {
+    "deviceId": "ESP32_1",
+    "year": 2025,
+    "month": 11,
+    "days": [
+      { "day": 1, "RadTot": 480, "RadPro": 320, "RadMax": 520, "HR": 65, "Tmax": 22, "Tmin": 18, "Tpro": 20.5 },
+      { "day": 2, "RadTot": 600, "RadPro": 600, "RadMax": 600, "HR": 70, "Tmax": 25, "Tmin": 21, "Tpro": 23.5 }
+    ]
+  }
+  ```
 
 - `POST /hourly/recalculate`: recalcula promedios horarios para un rango `[from, to)` con filtros opcionales `deviceId` y/o `sensorType`. Protegido por defecto con `protect + authorize("admin")`; se puede desactivar en desarrollo con `REPORTS_AUTH_DISABLED=true`.
 
@@ -75,7 +102,7 @@ curl -H "Authorization: Bearer <TOKEN>" \
   "http://localhost:3000/api/reports/daily?deviceId=ESP32_1&date=2025-11-02"
 
 curl -H "Authorization: Bearer <TOKEN>" \
-  "http://localhost:3000/api/reports/monthly?deviceId=ESP32_2&year=2025&month=11"
+  "http://localhost:3000/api/reports/monthly?deviceId=ESP32_1&year=2025&month=11"
 ```
 
 > Sustituye `<TOKEN>` por un JWT válido o exporta `REPORTS_AUTH_DISABLED=true` en local.

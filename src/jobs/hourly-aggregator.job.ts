@@ -1,7 +1,6 @@
 import cron, { ScheduledTask } from "node-cron";
 import { DateTime } from "luxon";
 import { upsertHourlyAverages } from "../services/reports.service";
-import { DEFAULT_TIMEZONE } from "../utils/timezone";
 
 const CRON_EXPRESSION = "*/5 * * * *"; // Cada 5 minutos
 const JOB_ENABLED =
@@ -13,7 +12,7 @@ let task: ScheduledTask | undefined;
 const logPrefix = "[reports/hourly-job]";
 
 const computeLastCompletedHourWindow = () => {
-  const now = DateTime.now().setZone(DEFAULT_TIMEZONE);
+  const now = DateTime.utc();
   const to = now.startOf("hour");
   const from = to.minus({ hours: 1 });
   return { from, to };
@@ -56,7 +55,7 @@ export const startHourlyAggregationJob = (): ScheduledTask | undefined => {
       }
     },
     {
-      timezone: DEFAULT_TIMEZONE,
+      timezone: "UTC",
     }
   );
 

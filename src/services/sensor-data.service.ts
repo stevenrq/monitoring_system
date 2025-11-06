@@ -1,6 +1,5 @@
 import { PipelineStage } from "mongoose";
 import SensorData, { ISensorDataDocument } from "../models/sensor-data.model";
-import { DEFAULT_TIMEZONE, toZonedISOString } from "../utils/timezone";
 
 const escapeRegex = (value: string): string =>
   value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -21,13 +20,11 @@ export interface LatestSensorReading {
   value: number;
   unit: string;
   timestamp: string;
-  timestampUtc: string;
 }
 
 interface LatestSensorReadingRaw
-  extends Omit<LatestSensorReading, "timestamp" | "timestampUtc"> {
+  extends Omit<LatestSensorReading, "timestamp"> {
   timestamp: Date;
-  timestampLocal?: string;
 }
 
 /**
@@ -55,19 +52,15 @@ export interface SensorReportEntry {
   firstTimestamp: string;
   lastTimestamp: string;
   latestValue: number;
-  firstTimestampUtc: string;
-  lastTimestampUtc: string;
 }
 
 interface SensorReportEntryRaw
   extends Omit<
     SensorReportEntry,
-    "firstTimestamp" | "lastTimestamp" | "firstTimestampUtc" | "lastTimestampUtc"
+    "firstTimestamp" | "lastTimestamp"
   > {
   firstTimestamp: Date;
-  firstTimestampLocal?: string;
   lastTimestamp: Date;
-  lastTimestampLocal?: string;
 }
 
 /**
@@ -102,7 +95,6 @@ export const getLatestSensorReadings = async (
       value: { $first: "$value" },
       unit: { $first: "$unit" },
       timestamp: { $first: "$timestamp" },
-      timestampLocal: { $first: "$timestampLocal" },
     },
   });
   pipeline.push({
@@ -113,7 +105,6 @@ export const getLatestSensorReadings = async (
       value: 1,
       unit: 1,
       timestamp: 1,
-      timestampLocal: 1,
     },
   });
   pipeline.push({ $sort: { deviceId: 1, sensorType: 1 } });
@@ -121,18 +112,12 @@ export const getLatestSensorReadings = async (
   const results = await SensorData.aggregate<LatestSensorReadingRaw>(pipeline);
 
   return results.map((reading) => {
-    const timestampUtc = reading.timestamp.toISOString();
-    const timestampLocal =
-      reading.timestampLocal ||
-      toZonedISOString(reading.timestamp, DEFAULT_TIMEZONE);
-
     return {
       deviceId: reading.deviceId,
       sensorType: reading.sensorType,
       value: reading.value,
       unit: reading.unit,
-      timestamp: timestampLocal,
-      timestampUtc,
+      timestamp: reading.timestamp.toISOString(),
     };
   });
 };
@@ -186,9 +171,7 @@ export const getSensorReport = async (
       maxValue: { $max: "$value" },
       averageValue: { $avg: "$value" },
       firstTimestamp: { $first: "$timestamp" },
-      firstTimestampLocal: { $first: "$timestampLocal" },
       lastTimestamp: { $last: "$timestamp" },
-      lastTimestampLocal: { $last: "$timestampLocal" },
       latestValue: { $last: "$value" },
     },
   });
@@ -203,9 +186,7 @@ export const getSensorReport = async (
       maxValue: 1,
       averageValue: 1,
       firstTimestamp: 1,
-      firstTimestampLocal: 1,
       lastTimestamp: 1,
-      lastTimestampLocal: 1,
       latestValue: 1,
     },
   });
@@ -214,16 +195,6 @@ export const getSensorReport = async (
   const results = await SensorData.aggregate<SensorReportEntryRaw>(pipeline);
 
   return results.map((entry) => {
-    const firstTimestampUtc = entry.firstTimestamp.toISOString();
-    const lastTimestampUtc = entry.lastTimestamp.toISOString();
-
-    const firstLocal =
-      entry.firstTimestampLocal ||
-      toZonedISOString(entry.firstTimestamp, DEFAULT_TIMEZONE);
-    const lastLocal =
-      entry.lastTimestampLocal ||
-      toZonedISOString(entry.lastTimestamp, DEFAULT_TIMEZONE);
-
     return {
       deviceId: entry.deviceId,
       sensorType: entry.sensorType,
@@ -233,10 +204,8 @@ export const getSensorReport = async (
       maxValue: entry.maxValue,
       averageValue: entry.averageValue,
       latestValue: entry.latestValue,
-      firstTimestamp: firstLocal,
-      lastTimestamp: lastLocal,
-      firstTimestampUtc,
-      lastTimestampUtc,
+      firstTimestamp: entry.firstTimestamp.toISOString(),
+      lastTimestamp: entry.lastTimestamp.toISOString(),
     };
   });
 };

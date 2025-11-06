@@ -8,7 +8,6 @@ import {
   getMonthlyReport,
   upsertHourlyAverages,
 } from "../services/reports.service";
-import { DEFAULT_TIMEZONE } from "../utils/timezone";
 
 const decodeValue = (value: unknown): unknown => {
   if (typeof value === "string") {
@@ -65,7 +64,6 @@ const hourlyQuerySchema = z
         "Invalid ISO datetime"
       )
       .optional(),
-    timezone: z.string().trim().optional(),
     limit: z.coerce.number().int().positive().max(2000).optional(),
     page: z.coerce.number().int().positive().optional(),
   })
@@ -89,7 +87,6 @@ const hourlyQuerySchema = z
 const dailyQuerySchema = z.object({
   deviceId: z.string().trim().min(1, "deviceId es requerido"),
   date: isoDateSchema,
-  timezone: z.string().trim().optional(),
 });
 
 const monthlyQuerySchema = z.object({
@@ -104,7 +101,6 @@ const monthlyQuerySchema = z.object({
     .int()
     .min(1, "El mes debe estar entre 1 y 12.")
     .max(12, "El mes debe estar entre 1 y 12."),
-  timezone: z.string().trim().optional(),
 });
 
 const respondWithValidationError = (res: Response, error: z.ZodError) => {
@@ -119,8 +115,8 @@ const respondWithValidationError = (res: Response, error: z.ZodError) => {
   });
 };
 
-const parseDateFromISO = (value: string, timezone: string): Date => {
-  const dt = DateTime.fromISO(value, { zone: timezone });
+const parseDateFromISO = (value: string): Date => {
+  const dt = DateTime.fromISO(value, { zone: "utc" });
   if (!dt.isValid) {
     throw new Error(dt.invalidReason ?? "Fecha inválida.");
   }
@@ -129,16 +125,16 @@ const parseDateFromISO = (value: string, timezone: string): Date => {
 
 const HAS_OFFSET_REGEX = /[zZ]|[+-]\d{2}:\d{2}$/;
 
-const parseInstantWithTimezone = (value: string, timezone: string): Date => {
+const parseInstant = (value: string): Date => {
   const hasExplicitOffset = HAS_OFFSET_REGEX.test(value);
   const options = hasExplicitOffset
     ? { setZone: true }
-    : { zone: timezone };
+    : { zone: "utc" };
   const dt = DateTime.fromISO(value, options);
   if (!dt.isValid) {
     throw new Error(dt.invalidReason ?? "Fecha inválida.");
   }
-  return dt.toJSDate();
+  return dt.toUTC().toJSDate();
 };
 
 const hourlyRecalcSchema = z.object({
@@ -156,7 +152,6 @@ const hourlyRecalcSchema = z.object({
       (value) => DateTime.fromISO(value, { setZone: true }).isValid,
       "Invalid ISO datetime"
     ),
-  timezone: z.string().trim().optional(),
 });
 
 /**
@@ -171,23 +166,21 @@ export const hourlyReportHandler = async (req: Request, res: Response) => {
   }
 
   try {
-    const timezone = result.data.timezone ?? DEFAULT_TIMEZONE;
     const hourlyFilters: HourlyReportFilters = {
       deviceId: result.data.deviceId,
       sensorType: result.data.sensorType,
-      timezone,
       limit: result.data.limit,
       page: result.data.page,
       date: result.data.date
-        ? parseDateFromISO(result.data.date, timezone)
+        ? parseDateFromISO(result.data.date)
         : undefined,
       from:
         result.data.from && result.data.to
-          ? parseInstantWithTimezone(result.data.from, timezone)
+          ? parseInstant(result.data.from)
           : undefined,
       to:
         result.data.from && result.data.to
-          ? parseInstantWithTimezone(result.data.to, timezone)
+          ? parseInstant(result.data.to)
           : undefined,
     };
 
@@ -214,13 +207,12 @@ export const dailyReportHandler = async (req: Request, res: Response) => {
     return respondWithValidationError(res, result.error);
   }
 
-  const { deviceId, date, timezone } = result.data;
+  const { deviceId, date } = result.data;
 
   try {
     const payload = await getDailyReport(
       deviceId,
-      parseDateFromISO(date, timezone ?? DEFAULT_TIMEZONE),
-      timezone
+      parseDateFromISO(date)
     );
     return res.status(200).json(payload);
   } catch (error) {
@@ -242,10 +234,10 @@ export const monthlyReportHandler = async (req: Request, res: Response) => {
     return respondWithValidationError(res, result.error);
   }
 
-  const { deviceId, year, month, timezone } = result.data;
+  const { deviceId, year, month } = result.data;
 
   try {
-    const payload = await getMonthlyReport(deviceId, year, month, timezone);
+    const payload = await getMonthlyReport(deviceId, year, month);
     return res.status(200).json(payload);
   } catch (error) {
     if (error instanceof Error) {
@@ -267,12 +259,12 @@ export const recalculateHourlyHandler = async (req: Request, res: Response) => {
     return respondWithValidationError(res, result.error);
   }
 
-  const { from, to, deviceId, sensorType, timezone } = result.data;
+  const { from, to, deviceId, sensorType } = result.data;
 
   try {
     const response = await upsertHourlyAverages({
-      from: parseInstantWithTimezone(from, timezone ?? DEFAULT_TIMEZONE),
-      to: parseInstantWithTimezone(to, timezone ?? DEFAULT_TIMEZONE),
+      from: parseInstant(from),
+      to: parseInstant(to),
       deviceId,
       sensorType,
     });
