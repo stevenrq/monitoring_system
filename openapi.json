@@ -7,22 +7,17 @@
   },
   "servers": [
     {
-      "url": "http://34.227.8.130:3000",
-      "description": "Servidor de producción",
-      "variables": {
-        "backendUrl": {
-          "default": "http://34.227.8.130:3000",
-          "description": "URL base del backend."
-        }
-      }
-    },
-    {
-      "url": "http://localhost:3000",
-      "description": "Servidor principal de la API",
+      "url": "{backendUrl}",
+      "description": "Servidor HTTP del Sistema de Monitoreo Ambiental. Sustituye {backendUrl} con la URL definida en la variable de entorno BACKEND_URL para apuntar al entorno correspondiente.",
       "variables": {
         "backendUrl": {
           "default": "http://localhost:3000",
-          "description": "URL base del backend."
+          "enum": [
+            "http://localhost:3000",
+            "https://monitoring-system-opbd.onrender.com",
+            "http://ec2-98-86-100-220.compute-1.amazonaws.com:3000"
+          ],
+          "description": "Valores soportados por BACKEND_URL (local, Render y EC2)."
         }
       }
     }
@@ -43,14 +38,20 @@
     {
       "name": "Sensores",
       "description": "Consultas de lecturas y reportes de sensores"
+    },
+    {
+      "name": "Reportes",
+      "description": "Agregaciones y reportes históricos por dispositivo y sensor"
     }
   ],
   "paths": {
     "/api/auth/login": {
       "post": {
-        "tags": ["Autenticación"],
-        "summary": "Inicia sesión y obtiene un token de acceso",
-        "description": "Valida las credenciales del usuario y entrega un token de acceso en formato JWT. También envía una cookie segura con el refresh token.",
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Autentica a un usuario y abre una sesión JWT",
+        "description": "Valida el par username/password recibido, genera un nuevo accessToken JWT y persiste un refreshToken vinculado al usuario. El refresh token se entrega como cookie httpOnly mientras que el accessToken viaja en la respuesta; el frontend debe almacenarlo en memoria y enviarlo en el encabezado Authorization para las siguientes llamadas protegidas.",
         "requestBody": {
           "required": true,
           "content": {
@@ -93,9 +94,11 @@
     },
     "/api/auth/refresh": {
       "post": {
-        "tags": ["Autenticación"],
-        "summary": "Genera un nuevo par de tokens",
-        "description": "Usa el refresh token (enviado mediante cookie) para generar un nuevo token de acceso y un nuevo refresh token.",
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Intercambia el refresh token por un par de tokens vigente",
+        "description": "Lee la cookie refreshToken emitida durante el login, valida que siga vigente en base de datos y entrega un nuevo accessToken junto a un nuevo refreshToken. El frontend debe usar este endpoint cuando reciba un 401 por expiración del accessToken y sustituir el token anterior por el nuevo.",
         "security": [
           {
             "cookieAuth": []
@@ -127,9 +130,11 @@
     },
     "/api/auth/forgot-password": {
       "post": {
-        "tags": ["Autenticación"],
-        "summary": "Solicita el restablecimiento de contraseña",
-        "description": "Envía una contraseña temporal al correo asociado. El flujo no revela si el correo existe en el sistema.",
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Solicita una contraseña temporal por correo electrónico",
+        "description": "Recibe el email del usuario y, si existe en el sistema, genera una contraseña aleatoria de 12 caracteres, la almacena encriptada y envía las instrucciones vía SendGrid. Siempre responde 200 para no filtrar si un correo está registrado, por lo que el frontend solo debe mostrar un mensaje informativo al usuario.",
         "requestBody": {
           "required": true,
           "content": {
@@ -166,9 +171,11 @@
     },
     "/api/auth/change-password": {
       "post": {
-        "tags": ["Autenticación"],
-        "summary": "Cambia la contraseña del usuario autenticado",
-        "description": "Requiere un token de acceso válido. Invalida el refresh token previo para reforzar la seguridad.",
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Actualiza la contraseña del usuario autenticado",
+        "description": "Requiere un accessToken válido y los campos oldPassword y newPassword. Si la contraseña actual coincide, guarda la nueva credencial encriptada y elimina el refreshToken previo para forzar un nuevo inicio de sesión. Tras un 200 el frontend debe descartar tokens en memoria y pedir al usuario que inicie sesión nuevamente.",
         "security": [
           {
             "bearerAuth": []
@@ -220,9 +227,11 @@
     },
     "/api/auth/authenticated-user": {
       "get": {
-        "tags": ["Autenticación"],
-        "summary": "Obtiene la información del usuario autenticado",
-        "description": "Devuelve los datos del usuario asociado al token de acceso proporcionado.",
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Devuelve el perfil del usuario dueño del token",
+        "description": "Retorna el documento completo del usuario asociado al accessToken proporcionado. Útil para hidratar el estado global del frontend al cargar la aplicación y determinar permisos, rol y datos de contacto.",
         "security": [
           {
             "bearerAuth": []
@@ -264,9 +273,11 @@
     },
     "/api/auth/create-admin": {
       "post": {
-        "tags": ["Autenticación"],
-        "summary": "Crea una nueva cuenta con rol administrador",
-        "description": "Solo los usuarios con rol administrador pueden crear nuevas cuentas administrativas.",
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Crea un nuevo usuario con rol administrador",
+        "description": "Solo disponible para usuarios con rol admin. Recibe los mismos campos que el alta de usuarios normales pero fuerza el rol admin y devuelve el documento persistido. Úsalo desde el panel de gestión cuando se necesite invitar a otro operador con privilegios completos.",
         "security": [
           {
             "bearerAuth": []
@@ -340,9 +351,11 @@
     },
     "/api/users": {
       "post": {
-        "tags": ["Usuarios"],
-        "summary": "Crea un nuevo usuario",
-        "description": "Solo administradores pueden registrar usuarios. La contraseña se cifra antes de guardarse.",
+        "tags": [
+          "Usuarios"
+        ],
+        "summary": "Registra un usuario operativo del sistema",
+        "description": "Crea un usuario con los datos de contacto, credenciales y rol indicados. La contraseña se encripta antes de guardarse y se valida la unicidad de email, teléfono y username. Devuelve el usuario recién creado junto con un mensaje descriptivo para mostrar en la interfaz.",
         "security": [
           {
             "bearerAuth": []
@@ -414,9 +427,11 @@
         }
       },
       "get": {
-        "tags": ["Usuarios"],
-        "summary": "Lista a todos los usuarios",
-        "description": "Solo administradores pueden consultar la lista completa de usuarios.",
+        "tags": [
+          "Usuarios"
+        ],
+        "summary": "Lista todos los usuarios registrados",
+        "description": "Devuelve un arreglo con todos los usuarios dados de alta, ordenados por fecha de creación. Está protegido para administradores y sirve para poblar tablas de gestión o para buscar usuarios por nombre, correo o rol.",
         "security": [
           {
             "bearerAuth": []
@@ -461,9 +476,11 @@
     },
     "/api/users/{id}": {
       "get": {
-        "tags": ["Usuarios"],
-        "summary": "Obtiene un usuario por su ID",
-        "description": "Devuelve la información completa del usuario solicitado.",
+        "tags": [
+          "Usuarios"
+        ],
+        "summary": "Obtiene el detalle de un usuario específico",
+        "description": "Recupera la información completa del usuario identificado por el parámetro id. Si no existe devuelve 404. Úsalo para prellenar formularios de edición o mostrar la ficha de un operador.",
         "security": [
           {
             "bearerAuth": []
@@ -524,9 +541,11 @@
         }
       },
       "put": {
-        "tags": ["Usuarios"],
-        "summary": "Actualiza un usuario existente",
-        "description": "Permite modificar la información de un usuario. Los campos que no se envíen permanecerán sin cambios.",
+        "tags": [
+          "Usuarios"
+        ],
+        "summary": "Actualiza información de un usuario existente",
+        "description": "Permite modificar datos personales, credenciales y rol de un usuario. El backend valida unicidad y reglas de negocio antes de guardar. Tras una respuesta exitosa, el frontend debe refrescar la vista con los valores retornados en la propiedad user.",
         "security": [
           {
             "bearerAuth": []
@@ -607,9 +626,11 @@
         }
       },
       "delete": {
-        "tags": ["Usuarios"],
-        "summary": "Elimina un usuario",
-        "description": "Borra permanentemente al usuario indicado. Esta acción no se puede deshacer.",
+        "tags": [
+          "Usuarios"
+        ],
+        "summary": "Elimina definitivamente un usuario",
+        "description": "Borra el usuario indicado y responde con un mensaje de confirmación. Es una operación destructiva sin papelera, por lo que el frontend debería solicitar confirmación previa y actualizar la tabla de usuarios cuando reciba el 200.",
         "security": [
           {
             "bearerAuth": []
@@ -672,9 +693,11 @@
     },
     "/api/plants": {
       "post": {
-        "tags": ["Plantas"],
-        "summary": "Crea una nueva planta",
-        "description": "Registra una planta que será monitoreada. Solo accesible para administradores.",
+        "tags": [
+          "Plantas"
+        ],
+        "summary": "Crea una planta con sus umbrales de sensores",
+        "description": "Registra una nueva planta a monitorear incluyendo name, deviceId y el objeto thresholds con los rangos permitidos por sensor. Se validan los mínimos/máximos y se impide duplicar nombres. El frontend debe construir el payload asegurando que cada sensor incluya al menos uno de los límites.",
         "security": [
           {
             "bearerAuth": []
@@ -734,9 +757,11 @@
         }
       },
       "get": {
-        "tags": ["Plantas"],
-        "summary": "Obtiene todas las plantas",
-        "description": "Recupera la lista completa de plantas registradas en el sistema.",
+        "tags": [
+          "Plantas"
+        ],
+        "summary": "Devuelve el catálogo completo de plantas",
+        "description": "Retorna todas las plantas configuradas con sus thresholds actualmente aplicados. El resultado se usa para poblar catálogos, tableros y para conocer qué dispositivo físico está asociado a cada especie monitoreada.",
         "security": [
           {
             "bearerAuth": []
@@ -791,8 +816,10 @@
     },
     "/api/plants/{id}": {
       "get": {
-        "tags": ["Plantas"],
-        "summary": "Obtiene una planta por ID",
+        "tags": [
+          "Plantas"
+        ],
+        "summary": "Consulta una planta por su identificador",
         "security": [
           {
             "bearerAuth": []
@@ -850,12 +877,15 @@
               }
             }
           }
-        }
+        },
+        "description": "Obtiene la planta almacenada con el id proporcionado incluyendo nombre, deviceId y thresholds. Si la planta no existe responde 404. Útil para pantallas de edición o para mostrar los umbrales vigentes de un cultivo."
       },
       "put": {
-        "tags": ["Plantas"],
-        "summary": "Actualiza la información de una planta",
-        "description": "Permite modificar los datos de una planta existente.",
+        "tags": [
+          "Plantas"
+        ],
+        "summary": "Actualiza los datos y umbrales de una planta",
+        "description": "Permite sobrescribir nombre, deviceId y thresholds de la planta. Las mismas reglas de validación del alta aplican (mínimo <= máximo, umbrales presentes por sensor). Tras un 200, el frontend obtiene la planta actualizada dentro de la respuesta.",
         "security": [
           {
             "bearerAuth": []
@@ -945,9 +975,11 @@
         }
       },
       "delete": {
-        "tags": ["Plantas"],
-        "summary": "Elimina una planta",
-        "description": "Borra permanentemente la planta del sistema.",
+        "tags": [
+          "Plantas"
+        ],
+        "summary": "Elimina una planta del catálogo",
+        "description": "Quita definitivamente la planta del sistema y devuelve un mensaje de confirmación. Antes de llamar a este endpoint el frontend debería avisar al usuario que se dejarán de generar alertas para ese deviceId.",
         "security": [
           {
             "bearerAuth": []
@@ -1010,9 +1042,11 @@
     },
     "/api/sensor-data/latest": {
       "get": {
-        "tags": ["Sensores"],
-        "summary": "Obtiene la última lectura de cada combinación dispositivo + tipo de sensor",
-        "description": "Devuelve la lectura más reciente registrada para cada sensor. Si no se especifica `deviceId`, se devuelven todas las últimas lecturas agrupadas por sensor y dispositivo.",
+        "tags": [
+          "Sensores"
+        ],
+        "summary": "Obtiene la última lectura consolidada por sensor",
+        "description": "Agrupa las lecturas crudas por deviceId y sensorType para devolver el último valor registrado, junto con unidades y timestamps en zona local y UTC. Acepta filtrar por deviceId para limitar la respuesta a un equipo y sirve para tarjetas tipo \"estado actual\" en el dashboard.",
         "parameters": [
           {
             "in": "query",
@@ -1059,7 +1093,9 @@
             "description": "Parámetro inválido (por ejemplo, formato incorrecto).",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorRespuesta" },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                },
                 "example": {
                   "error": "El parámetro 'deviceId' no es válido."
                 }
@@ -1071,14 +1107,18 @@
     },
     "/api/sensor-data/report": {
       "get": {
-        "tags": ["Sensores"],
-        "summary": "Genera un reporte estadístico por sensor",
-        "description": "Calcula estadísticas por cada combinación dispositivo + tipo de sensor. Soporta filtros por tipo, dispositivo y rango de fechas.",
+        "tags": [
+          "Sensores"
+        ],
+        "summary": "Genera estadísticas de lecturas crudas",
+        "description": "Calcula min, max, promedio, cantidad de muestras y valor más reciente por combinación deviceId + sensorType respetando los filtros de rango de fechas. Ideal para paneles comparativos o para alimentar gráficos de barras/resumen en el frontend.",
         "parameters": [
           {
             "in": "query",
             "name": "deviceId",
-            "schema": { "type": "string" },
+            "schema": {
+              "type": "string"
+            },
             "required": false,
             "description": "Filtra solo por un dispositivo específico.",
             "example": "ESP32_02"
@@ -1086,7 +1126,9 @@
           {
             "in": "query",
             "name": "sensorType",
-            "schema": { "type": "string" },
+            "schema": {
+              "type": "string"
+            },
             "required": false,
             "description": "Filtra por tipo de sensor.",
             "example": "humidity"
@@ -1119,7 +1161,9 @@
               "application/json": {
                 "schema": {
                   "type": "array",
-                  "items": { "$ref": "#/components/schemas/ReporteSensor" }
+                  "items": {
+                    "$ref": "#/components/schemas/ReporteSensor"
+                  }
                 },
                 "example": [
                   {
@@ -1142,7 +1186,9 @@
             "description": "Formato de fecha inválido o parámetros incorrectos.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorRespuesta" },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                },
                 "example": {
                   "error": "El formato de fecha es inválido. Usa un ISO string válido."
                 }
@@ -1154,14 +1200,18 @@
     },
     "/api/sensor-data/raw": {
       "get": {
-        "tags": ["Sensores"],
-        "summary": "Obtiene lecturas individuales sin agregación",
-        "description": "Devuelve los documentos originales almacenados en la base de datos. Permite filtrar por dispositivo, tipo, rango de fechas y limitar el número de resultados. Los resultados se ordenan por `timestamp` DESC.",
+        "tags": [
+          "Sensores"
+        ],
+        "summary": "Listar lecturas individuales en orden cronológico",
+        "description": "Devuelve los documentos originales almacenados en la colección sensor_readings respetando los filtros opcionales (deviceId, sensorType, from, to, limit). Se entrega ordenado por timestamp ascendente para facilitar la construcción de gráficas o tablas detalle.",
         "parameters": [
           {
             "in": "query",
             "name": "deviceId",
-            "schema": { "type": "string" },
+            "schema": {
+              "type": "string"
+            },
             "required": false,
             "description": "Filtra por dispositivo.",
             "example": "ESP32_01"
@@ -1169,7 +1219,9 @@
           {
             "in": "query",
             "name": "sensorType",
-            "schema": { "type": "string" },
+            "schema": {
+              "type": "string"
+            },
             "required": false,
             "description": "Filtra por tipo de sensor.",
             "example": "temperature"
@@ -1216,7 +1268,9 @@
               "application/json": {
                 "schema": {
                   "type": "array",
-                  "items": { "$ref": "#/components/schemas/DatoSensorCrudo" }
+                  "items": {
+                    "$ref": "#/components/schemas/DatoSensorCrudo"
+                  }
                 },
                 "example": [
                   {
@@ -1243,9 +1297,373 @@
             "description": "Parámetros inválidos.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorRespuesta" },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                },
                 "example": {
                   "error": "El parámetro 'limit' debe ser un número entero positivo."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/hourly": {
+      "get": {
+        "tags": [
+          "Reportes"
+        ],
+        "summary": "Consulta los promedios horarios ya agregados",
+        "description": "Retorna los registros pre-calculados por el job de agregación, incluyendo valores promedio, mínimo, máximo, número de muestras y unidad. Permite filtrar por deviceId, sensorType, día puntual o rango [from, to) y admite paginación. Es la fuente principal para graficar series horarias.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del dispositivo a filtrar."
+          },
+          {
+            "name": "sensorType",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "temperature",
+                "humidity",
+                "soil_humidity",
+                "solar_radiation"
+              ]
+            },
+            "description": "Tipo de sensor a filtrar."
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "description": "Fecha (YYYY-MM-DD) para recuperar las 24 horas del día."
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Fecha/hora inicial (ISO 8601). Debe usarse junto con 'to'."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Fecha/hora final (ISO 8601). Debe usarse junto con 'from'."
+          },
+          {
+            "name": "timezone",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Zona horaria IANA utilizada para formatear la columna 'hour'. Por defecto: America/Bogota."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2000
+            },
+            "description": "Cantidad máxima de filas por página. Por defecto 500."
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Número de página a recuperar. Por defecto 1."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Listado paginado de métricas horarias.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HourlyReportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Parámetros inválidos o rango incorrecto.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/daily": {
+      "get": {
+        "tags": [
+          "Reportes"
+        ],
+        "summary": "Construye el reporte diario de 24 horas",
+        "description": "Ensambla un resumen con 24 filas (una por hora) y métricas globales del día solicitado: extremos de temperatura, humedad promedio y energía solar. Requiere deviceId y date (YYYY-MM-DD) y respeta la zona horaria solicitada para formatear la respuesta.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del dispositivo que se desea consultar."
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "description": "Día a consultar en formato YYYY-MM-DD."
+          },
+          {
+            "name": "timezone",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Zona horaria para interpretar y formatear el día. Por defecto America/Bogota."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reporte diario generado correctamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyReportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Parámetros inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/monthly": {
+      "get": {
+        "tags": [
+          "Reportes"
+        ],
+        "summary": "Construye el reporte mensual por dispositivo",
+        "description": "Devuelve una lista con un registro por día del mes solicitado, incluyendo temperaturas máximas/mínimas/promedio, humedad relativa y radiación total, promedio y máxima. Sirve para componentes de calendario o tablas de seguimiento mensual.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del dispositivo que se desea consultar."
+          },
+          {
+            "name": "year",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 2000,
+              "maximum": 2100
+            },
+            "description": "Año en formato YYYY."
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "description": "Mes numérico (1-12)."
+          },
+          {
+            "name": "timezone",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Zona horaria para interpretar el mes. Por defecto America/Bogota."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reporte mensual generado correctamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonthlyReportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Parámetros inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/hourly/recalculate": {
+      "post": {
+        "tags": [
+          "Reportes"
+        ],
+        "summary": "Reprocesa los promedios horarios en un rango específico",
+        "description": "Ejecuta nuevamente la canalización de agregación sobre lecturas crudas en el rango [from, to), opcionalmente filtrando por deviceId y/o sensorType. Requiere permisos de administrador (salvo que REPORTS_AUTH_DISABLED sea true) y responde con el detalle de filas recalculadas para que el frontend confirme la acción al operador.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HourlyRecalculateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Proceso completado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Agregados horarios recalculados correctamente."
+                    },
+                    "upserted": {
+                      "type": "integer",
+                      "example": 48
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Parámetros inválidos o rango incorrecto.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
                 }
               }
             }
@@ -1272,7 +1690,10 @@
     "schemas": {
       "CredencialesLogin": {
         "type": "object",
-        "required": ["username", "password"],
+        "required": [
+          "username",
+          "password"
+        ],
         "properties": {
           "username": {
             "type": "string",
@@ -1305,7 +1726,9 @@
       },
       "SolicitudOlvidoPassword": {
         "type": "object",
-        "required": ["email"],
+        "required": [
+          "email"
+        ],
         "properties": {
           "email": {
             "type": "string",
@@ -1317,7 +1740,10 @@
       },
       "SolicitudCambioPassword": {
         "type": "object",
-        "required": ["oldPassword", "newPassword"],
+        "required": [
+          "oldPassword",
+          "newPassword"
+        ],
         "properties": {
           "oldPassword": {
             "type": "string",
@@ -1367,7 +1793,10 @@
           },
           "role": {
             "type": "string",
-            "enum": ["user", "admin"],
+            "enum": [
+              "user",
+              "admin"
+            ],
             "example": "user",
             "description": "Rol asignado al usuario."
           }
@@ -1431,7 +1860,10 @@
       },
       "PlantaBase": {
         "type": "object",
-        "required": ["name", "thresholds"],
+        "required": [
+          "name",
+          "thresholds"
+        ],
         "properties": {
           "name": {
             "type": "string",
@@ -1467,10 +1899,20 @@
             },
             "additionalProperties": false,
             "example": {
-              "temperature": { "min": 18, "max": 28 },
-              "humidity": { "min": 40, "max": 75 },
-              "soil_humidity": { "min": 20 },
-              "solar_radiation": { "max": 950 }
+              "temperature": {
+                "min": 18,
+                "max": 28
+              },
+              "humidity": {
+                "min": 40,
+                "max": 75
+              },
+              "soil_humidity": {
+                "min": 20
+              },
+              "solar_radiation": {
+                "max": 950
+              }
             }
           }
         }
@@ -1503,10 +1945,20 @@
           "deviceId": "ESP32_1",
           "name": "Tomate Cherry",
           "thresholds": {
-            "temperature": { "min": 18, "max": 30 },
-            "humidity": { "min": 45, "max": 80 },
-            "soil_humidity": { "min": 20 },
-            "solar_radiation": { "max": 900 }
+            "temperature": {
+              "min": 18,
+              "max": 30
+            },
+            "humidity": {
+              "min": 45,
+              "max": 80
+            },
+            "soil_humidity": {
+              "min": 20
+            },
+            "solar_radiation": {
+              "max": 900
+            }
           },
           "createdAt": "2024-05-21T15:12:30.123Z",
           "updatedAt": "2024-05-21T15:12:30.123Z"
@@ -1597,6 +2049,534 @@
             }
           }
         ]
+      },
+      "HourlyReportEntry": {
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "example": "ESP32_1"
+          },
+          "sensorType": {
+            "type": "string",
+            "enum": [
+              "temperature",
+              "humidity",
+              "soil_humidity",
+              "solar_radiation"
+            ],
+            "example": "temperature"
+          },
+          "hour": {
+            "type": "string",
+            "example": "2025-11-02T09:00:00-05:00"
+          },
+          "avg": {
+            "type": "number",
+            "example": 22.4
+          },
+          "min": {
+            "type": "number",
+            "example": 20.1
+          },
+          "max": {
+            "type": "number",
+            "example": 24.9
+          },
+          "samples": {
+            "type": "integer",
+            "example": 12
+          },
+          "units": {
+            "type": "string",
+            "example": "°C"
+          }
+        }
+      },
+      "HourlyReportPagination": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "example": 96
+          },
+          "limit": {
+            "type": "integer",
+            "example": 50
+          },
+          "page": {
+            "type": "integer",
+            "example": 1
+          },
+          "pages": {
+            "type": "integer",
+            "example": 2
+          }
+        }
+      },
+      "HourlyReportResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HourlyReportEntry"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/HourlyReportPagination"
+          }
+        },
+        "example": {
+          "data": [
+            {
+              "deviceId": "ESP32_1",
+              "sensorType": "temperature",
+              "hour": "2025-11-06T12:00:00-05:00",
+              "avg": 29.9,
+              "min": 10.47,
+              "max": 49.87,
+              "samples": 111,
+              "units": "°C"
+            }
+          ],
+          "pagination": {
+            "total": 1,
+            "limit": 500,
+            "page": 1,
+            "pages": 1
+          }
+        }
+      },
+      "DailyReportRow": {
+        "type": "object",
+        "properties": {
+          "hour": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 23,
+            "example": 13
+          },
+          "solar_radiation_avg": {
+            "type": "number",
+            "nullable": true,
+            "example": 520
+          },
+          "humidity_avg": {
+            "type": "number",
+            "nullable": true,
+            "example": 68.4
+          },
+          "temperature_avg": {
+            "type": "number",
+            "nullable": true,
+            "example": 24.7
+          },
+          "isTmax": {
+            "type": "boolean",
+            "nullable": true,
+            "example": true
+          },
+          "isTmin": {
+            "type": "boolean",
+            "nullable": true,
+            "example": false
+          }
+        }
+      },
+      "DailyReportTemperatureSummary": {
+        "type": "object",
+        "properties": {
+          "tmax": {
+            "type": "number",
+            "nullable": true,
+            "example": 30.5
+          },
+          "tmin": {
+            "type": "number",
+            "nullable": true,
+            "example": 18.2
+          },
+          "tpro": {
+            "type": "number",
+            "nullable": true,
+            "example": 24.6
+          }
+        }
+      },
+      "DailyReportHumiditySummary": {
+        "type": "object",
+        "properties": {
+          "hpro": {
+            "type": "number",
+            "nullable": true,
+            "example": 63.2
+          }
+        }
+      },
+      "DailyReportRadiationSummary": {
+        "type": "object",
+        "properties": {
+          "radTot": {
+            "type": "number",
+            "nullable": true,
+            "example": 4860
+          },
+          "radPro": {
+            "type": "number",
+            "nullable": true,
+            "example": 405
+          },
+          "radMax": {
+            "type": "number",
+            "nullable": true,
+            "example": 710
+          }
+        }
+      },
+      "DailyReportResponse": {
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "example": "ESP32_1"
+          },
+          "date": {
+            "type": "string",
+            "example": "2025-11-02"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DailyReportRow"
+            }
+          },
+          "temperature": {
+            "$ref": "#/components/schemas/DailyReportTemperatureSummary"
+          },
+          "humidity": {
+            "$ref": "#/components/schemas/DailyReportHumiditySummary"
+          },
+          "radiation": {
+            "$ref": "#/components/schemas/DailyReportRadiationSummary"
+          }
+        },
+        "example": {
+          "deviceId": "ESP32_1",
+          "date": "2025-11-06",
+          "rows": [
+            {
+              "hour": 0
+            },
+            {
+              "hour": 1
+            },
+            {
+              "hour": 2
+            },
+            {
+              "hour": 3
+            },
+            {
+              "hour": 4
+            },
+            {
+              "hour": 5
+            },
+            {
+              "hour": 6
+            },
+            {
+              "hour": 7
+            },
+            {
+              "hour": 8
+            },
+            {
+              "hour": 9
+            },
+            {
+              "hour": 10
+            },
+            {
+              "hour": 11
+            },
+            {
+              "hour": 12,
+              "humidity_avg": 78.65,
+              "solar_radiation_avg": 626.23,
+              "temperature_avg": 29.9,
+              "isTmax": true,
+              "isTmin": true
+            },
+            {
+              "hour": 13
+            },
+            {
+              "hour": 14
+            },
+            {
+              "hour": 15
+            },
+            {
+              "hour": 16
+            },
+            {
+              "hour": 17
+            },
+            {
+              "hour": 18
+            },
+            {
+              "hour": 19
+            },
+            {
+              "hour": 20
+            },
+            {
+              "hour": 21
+            },
+            {
+              "hour": 22
+            },
+            {
+              "hour": 23
+            }
+          ],
+          "temperature": {
+            "tmax": 29.9,
+            "tmin": 29.9,
+            "tpro": 29.9
+          },
+          "humidity": {
+            "hpro": 78.65
+          },
+          "radiation": {
+            "radTot": 626.23,
+            "radPro": 626.23,
+            "radMax": 626.23
+          }
+        }
+      },
+      "MonthlyReportDay": {
+        "type": "object",
+        "properties": {
+          "day": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 31,
+            "example": 12
+          },
+          "RadTot": {
+            "type": "number",
+            "nullable": true,
+            "example": 480
+          },
+          "RadPro": {
+            "type": "number",
+            "nullable": true,
+            "example": 320
+          },
+          "RadMax": {
+            "type": "number",
+            "nullable": true,
+            "example": 650
+          },
+          "HR": {
+            "type": "number",
+            "nullable": true,
+            "example": 65.3
+          },
+          "Tmax": {
+            "type": "number",
+            "nullable": true,
+            "example": 29.4
+          },
+          "Tmin": {
+            "type": "number",
+            "nullable": true,
+            "example": 17.6
+          },
+          "Tpro": {
+            "type": "number",
+            "nullable": true,
+            "example": 23.1
+          }
+        }
+      },
+      "MonthlyReportResponse": {
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "example": "ESP32_1"
+          },
+          "year": {
+            "type": "integer",
+            "example": 2025
+          },
+          "month": {
+            "type": "integer",
+            "example": 11
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MonthlyReportDay"
+            }
+          }
+        },
+        "example": {
+          "deviceId": "ESP32_1",
+          "year": 2025,
+          "month": 11,
+          "days": [
+            {
+              "day": 1
+            },
+            {
+              "day": 2
+            },
+            {
+              "day": 3
+            },
+            {
+              "day": 4
+            },
+            {
+              "day": 5
+            },
+            {
+              "day": 6,
+              "RadTot": 626.23,
+              "RadPro": 626.23,
+              "RadMax": 626.23,
+              "HR": 78.65,
+              "Tmax": 29.9,
+              "Tmin": 29.9,
+              "Tpro": 29.9
+            },
+            {
+              "day": 7
+            },
+            {
+              "day": 8
+            },
+            {
+              "day": 9
+            },
+            {
+              "day": 10
+            },
+            {
+              "day": 11
+            },
+            {
+              "day": 12
+            },
+            {
+              "day": 13
+            },
+            {
+              "day": 14
+            },
+            {
+              "day": 15
+            },
+            {
+              "day": 16
+            },
+            {
+              "day": 17
+            },
+            {
+              "day": 18
+            },
+            {
+              "day": 19
+            },
+            {
+              "day": 20
+            },
+            {
+              "day": 21
+            },
+            {
+              "day": 22
+            },
+            {
+              "day": 23
+            },
+            {
+              "day": 24
+            },
+            {
+              "day": 25
+            },
+            {
+              "day": 26
+            },
+            {
+              "day": 27
+            },
+            {
+              "day": 28
+            },
+            {
+              "day": 29
+            },
+            {
+              "day": 30
+            }
+          ]
+        }
+      },
+      "HourlyRecalculateRequest": {
+        "type": "object",
+        "required": [
+          "from",
+          "to"
+        ],
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "nullable": true,
+            "example": "ESP32_1"
+          },
+          "sensorType": {
+            "type": "string",
+            "enum": [
+              "temperature",
+              "humidity",
+              "soil_humidity",
+              "solar_radiation"
+            ],
+            "nullable": true,
+            "example": "temperature"
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-11-02T00:00:00-05:00"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-11-03T00:00:00-05:00"
+          },
+          "timezone": {
+            "type": "string",
+            "nullable": true,
+            "example": "America/Bogota"
+          }
+        },
+        "example": {
+          "deviceId": "ESP32_1",
+          "sensorType": "temperature",
+          "from": "2025-11-02T00:00:00-05:00",
+          "to": "2025-11-03T00:00:00-05:00",
+          "timezone": "America/Bogota"
+        }
       },
       "MensajeRespuesta": {
         "type": "object",

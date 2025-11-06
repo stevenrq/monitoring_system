@@ -3,6 +3,7 @@ import app from "./app";
 import * as http from "node:http";
 import { initializeWebSocket } from "./socket/socket.handler";
 import { initializePlantThresholds } from "./services/plant.service";
+import { startHourlyAggregationJob } from "./jobs/hourly-aggregator.job";
 
 const PORT = process.env.PORT || 3000;
 const server = http.createServer(app);
@@ -22,5 +23,6 @@ initializePlantThresholds()
 
 server.listen(PORT, () => {
   console.log(`Servidor escuchando en puerto ${PORT}`);
-  console.log(`WebSocket activo en ws://34.227.8.130:3000`);
+  console.log(`WebSocket activo en ws://98.86.100.220:3000`);
+  startHourlyAggregationJob();
 });
