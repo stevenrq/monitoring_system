@@ -1,5 +1,9 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { SensorPayload } from "../interfaces/sensor-payload";
+import {
+  ThresholdType,
+  sendSensorAlertNotification,
+} from "./push-notification.service";
 
 interface Threshold {
   min?: number;
@@ -131,18 +135,30 @@ export const checkSensorDataForAlerts = (
   if (!thresholds) return;
 
   let alertMessage: string | null = null;
+  let triggeredThresholdType: ThresholdType | null = null;
+  let triggeredThresholdValue: number | undefined;
 
   if (thresholds.max !== undefined && value > thresholds.max) {
     alertMessage = `¡Alerta en ${deviceId}! ${getSensorName(sensorType)} ha superado el máximo: ${value.toFixed(
       2
     )} ${unit} (Máx: ${thresholds.max} ${unit}).`;
+    triggeredThresholdType = "max";
+    triggeredThresholdValue = thresholds.max;
   } else if (thresholds.min !== undefined && value < thresholds.min) {
     alertMessage = `¡Alerta en ${deviceId}! ${getSensorName(sensorType)} está por debajo del mínimo: ${value.toFixed(
       2
     )} ${unit} (Mín: ${thresholds.min} ${unit}).`;
+    triggeredThresholdType = "min";
+    triggeredThresholdValue = thresholds.min;
   }
 
-  if (!alertMessage) return;
+  if (
+    !alertMessage ||
+    !triggeredThresholdType ||
+    triggeredThresholdValue === undefined
+  ) {
+    return;
+  }
 
   const alertKey = `${deviceId}-${sensorType}`;
   const now = Date.now();
@@ -158,11 +174,12 @@ export const checkSensorDataForAlerts = (
 
   console.log(`ALERTA: ${alertMessage}`);
 
+  const timestamp = new Date().toISOString();
   const alertPayload = {
     event: "sensorAlert",
     deviceId,
     message: alertMessage,
-    timestamp: new Date().toISOString(),
+    timestamp,
   };
 
   // Enviar a todos los clientes conectados
@@ -172,6 +189,22 @@ export const checkSensorDataForAlerts = (
       client.send(payloadStr);
     }
   }
+
+  void sendSensorAlertNotification({
+    deviceId,
+    sensorType,
+    value,
+    unit,
+    thresholdType: triggeredThresholdType,
+    thresholdValue: triggeredThresholdValue,
+    message: alertMessage,
+    timestamp,
+  }).catch((error) => {
+    console.error(
+      "No se pudo enviar la alerta vía Firebase Cloud Messaging:",
+      error
+    );
+  });
 };
 
 /**

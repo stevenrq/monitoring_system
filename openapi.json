@@ -42,6 +42,10 @@
     {
       "name": "Reportes",
       "description": "Agregaciones y reportes históricos por dispositivo y sensor"
+    },
+    {
+      "name": "Notificaciones",
+      "description": "Registro de tokens FCM y distribución de alertas push"
     }
   ],
   "paths": {
@@ -1774,6 +1778,79 @@
         }
       }
     }
+    ,
+    "/api/notifications/tokens": {
+      "post": {
+        "tags": [
+          "Notificaciones"
+        ],
+        "summary": "Registra o actualiza un token FCM para el usuario autenticado",
+        "description": "Permite que la app cliente envíe el token FCM generado por Firebase Cloud Messaging para recibir alertas. El backend normaliza la plataforma y el identificador del dispositivo, marca el token como activo y sobrescribe registros previos que tengan el mismo valor.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistroTokenFcmRequest"
+              },
+              "example": {
+                "token": "fcm_device_token_recibido_en_flutter",
+                "deviceId": "pixel_8_pro",
+                "platform": "android"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Token registrado correctamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenFcmRespuesta"
+                },
+                "example": {
+                  "id": "65f90c0f4dfdc0bce81dfbd1",
+                  "user": "65f90be94dfdc0bce81dfbcf",
+                  "token": "fcm_device_token_recibido_en_flutter",
+                  "deviceId": "pixel_8_pro",
+                  "platform": "android",
+                  "active": true,
+                  "lastUsedAt": "2024-02-15T18:30:10.123Z",
+                  "createdAt": "2024-02-15T18:30:10.123Z",
+                  "updatedAt": "2024-02-15T18:30:10.123Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos o token ausente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado o token JWT inválido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   },
   "components": {
     "securitySchemes": {
@@ -1857,6 +1934,86 @@
             "type": "string",
             "example": "CambioSeguro2025",
             "description": "Nueva contraseña que sustituirá a la contraseña actual."
+          }
+        }
+      },
+      "RegistroTokenFcmRequest": {
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Valor del token generado por Firebase Cloud Messaging en el dispositivo.",
+            "example": "fcm_device_token_recibido_en_flutter"
+          },
+          "deviceId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Identificador legible del dispositivo que envía el token (por ejemplo, modelo o UUID local).",
+            "example": "pixel_8_pro"
+          },
+          "platform": {
+            "type": "string",
+            "nullable": true,
+            "description": "Plataforma del dispositivo. Se normaliza internamente a `android`, `ios`, `web` u `other`.",
+            "example": "android"
+          }
+        }
+      },
+      "TokenFcmRespuesta": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Identificador del documento almacenado en MongoDB.",
+            "example": "65f90c0f4dfdc0bce81dfbd1"
+          },
+          "user": {
+            "type": "string",
+            "description": "Identificador del usuario propietario del token.",
+            "example": "65f90be94dfdc0bce81dfbcf"
+          },
+          "token": {
+            "type": "string",
+            "description": "Token FCM tal como fue recibido desde el cliente.",
+            "example": "fcm_device_token_recibido_en_flutter"
+          },
+          "deviceId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Dispositivo asociado al token.",
+            "example": "pixel_8_pro"
+          },
+          "platform": {
+            "type": "string",
+            "nullable": true,
+            "description": "Plataforma normalizada del dispositivo.",
+            "example": "android"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Indica si el token está habilitado para recibir notificaciones.",
+            "example": true
+          },
+          "lastUsedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Última vez que el token fue sincronizado con el backend.",
+            "example": "2024-02-15T18:30:10.123Z"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Fecha de creación del registro.",
+            "example": "2024-02-15T18:30:10.123Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Fecha de la última actualización.",
+            "example": "2024-02-15T18:30:10.123Z"
           }
         }
       },
