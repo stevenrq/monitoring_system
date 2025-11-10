@@ -54,3 +54,4 @@ env_vars/
 run.sh
 monitoring-system-f50e6-firebase-adminsdk-fbsvc-b4d4c8a399.json
 sgivu-ec2-keypair.pem
+copy-local-to-remote.sh
