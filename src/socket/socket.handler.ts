@@ -140,7 +140,7 @@ export function initializeWebSocket(server: http.Server) {
               if (client.readyState === WebSocket.OPEN) client.send(payload);
             }
 
-            checkSensorDataForAlerts(wss, sensorData);
+            await checkSensorDataForAlerts(wss, sensorData);
           }
 
           ws.send(

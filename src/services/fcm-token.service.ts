@@ -1,3 +1,4 @@
+import { FilterQuery } from "mongoose";
 import FcmToken, { IFcmTokenDocument } from "../models/fcm-token.model";
 
 export interface RegisterFcmTokenPayload {
@@ -59,4 +60,38 @@ export const registerFcmToken = async (
   }
 
   return tokenDoc;
+};
+
+export interface FcmTokenFilters {
+  deviceId?: string;
+  userId?: string;
+}
+
+export const getActiveFcmTokens = async (
+  filters?: FcmTokenFilters
+): Promise<string[]> => {
+  const query: FilterQuery<IFcmTokenDocument> = {
+    active: true,
+  };
+
+  const normalizedDeviceId = filters?.deviceId?.trim();
+  if (normalizedDeviceId) {
+    query.$or = [
+      { deviceId: normalizedDeviceId },
+      { deviceId: { $exists: false } },
+      { deviceId: null },
+    ];
+  }
+
+  const normalizedUserId = filters?.userId?.trim();
+  if (normalizedUserId) {
+    query.user = normalizedUserId;
+  }
+
+  const rows = await FcmToken.find(query).select("token").lean();
+  return rows
+    .map((row) =>
+      typeof row.token === "string" ? row.token.trim() : ""
+    )
+    .filter((token) => !!token);
 };

@@ -1,14 +1,19 @@
 import FcmToken from "../../src/models/fcm-token.model";
-import { registerFcmToken } from "../../src/services/fcm-token.service";
+import {
+  getActiveFcmTokens,
+  registerFcmToken,
+} from "../../src/services/fcm-token.service";
 
 jest.mock("../../src/models/fcm-token.model", () => ({
   __esModule: true,
   default: {
     findOneAndUpdate: jest.fn(),
+    find: jest.fn(),
   },
 }));
 
 const findOneAndUpdateMock = FcmToken.findOneAndUpdate as unknown as jest.Mock;
+const findMock = FcmToken.find as unknown as jest.Mock;
 
 describe("fcm-token.service", () => {
   beforeEach(() => {
@@ -88,5 +93,32 @@ describe("fcm-token.service", () => {
         userId: "user123",
       })
     ).rejects.toThrow("El token FCM es obligatorio.");
+  });
+
+  it("obtiene tokens activos filtrando por dispositivo", async () => {
+    const selectMock = jest.fn().mockReturnThis();
+    const leanMock = jest
+      .fn()
+      .mockResolvedValue([{ token: "abc" }, { token: "  " }]);
+
+    findMock.mockReturnValue({
+      select: selectMock,
+      lean: leanMock,
+    });
+
+    const tokens = await getActiveFcmTokens({ deviceId: "ESP32_1" });
+
+    expect(findMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        active: true,
+        $or: expect.arrayContaining([
+          { deviceId: "ESP32_1" },
+          { deviceId: { $exists: false } },
+          { deviceId: null },
+        ]),
+      })
+    );
+    expect(selectMock).toHaveBeenCalledWith("token");
+    expect(tokens).toEqual(["abc"]);
   });
 });

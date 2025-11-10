@@ -3,7 +3,9 @@ import { SensorPayload } from "../interfaces/sensor-payload";
 import {
   ThresholdType,
   sendSensorAlertNotification,
+  SensorAlertNotification,
 } from "./push-notification.service";
+import { getActiveFcmTokens } from "./fcm-token.service";
 
 interface Threshold {
   min?: number;
@@ -36,7 +38,7 @@ export function setAlertThreshold(
   sensorType: string,
   thresholds: Threshold
 ): Threshold | undefined {
-  const sanitized: Threshold = {};  
+  const sanitized: Threshold = {};
   const normalizedDeviceId = deviceId.trim();
   const normalizedSensorType = sensorType.trim();
 
@@ -121,10 +123,10 @@ export function getAlertThreshold(
  * @param wss Instancia del WebSocketServer (de la librería `ws`).
  * @param sensorData Datos del sensor.
  */
-export const checkSensorDataForAlerts = (
+export const checkSensorDataForAlerts = async (
   wss: WebSocketServer,
   sensorData: SensorPayload
-) => {
+): Promise<void> => {
   const { deviceId, sensorType, value, unit } = sensorData;
 
   if (!ALERT_ENABLED_DEVICE_IDS.has(deviceId)) {
@@ -190,7 +192,17 @@ export const checkSensorDataForAlerts = (
     }
   }
 
-  void sendSensorAlertNotification({
+  let tokens: string[] = [];
+  try {
+    tokens = await getActiveFcmTokens({ deviceId });
+  } catch (error) {
+    console.error(
+      "No se pudieron cargar los tokens FCM antes de enviar la alerta:",
+      error
+    );
+  }
+
+  const notificationPayload: SensorAlertNotification = {
     deviceId,
     sensorType,
     value,
@@ -199,7 +211,13 @@ export const checkSensorDataForAlerts = (
     thresholdValue: triggeredThresholdValue,
     message: alertMessage,
     timestamp,
-  }).catch((error) => {
+  };
+
+  if (tokens.length) {
+    notificationPayload.tokens = tokens;
+  }
+
+  void sendSensorAlertNotification(notificationPayload).catch((error) => {
     console.error(
       "No se pudo enviar la alerta vía Firebase Cloud Messaging:",
       error

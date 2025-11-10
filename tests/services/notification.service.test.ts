@@ -4,16 +4,24 @@ import {
   setAlertThreshold,
 } from "../../src/services/notification.service";
 import { sendSensorAlertNotification } from "../../src/services/push-notification.service";
+import { getActiveFcmTokens } from "../../src/services/fcm-token.service";
 
 jest.mock("../../src/services/push-notification.service", () => ({
   __esModule: true,
   sendSensorAlertNotification: jest.fn().mockResolvedValue("message-id"),
 }));
 
+jest.mock("../../src/services/fcm-token.service", () => ({
+  __esModule: true,
+  getActiveFcmTokens: jest.fn().mockResolvedValue(["token-a", "token-b"]),
+}));
+
 const sendSensorAlertNotificationMock =
   sendSensorAlertNotification as jest.MockedFunction<
     typeof sendSensorAlertNotification
   >;
+const getActiveFcmTokensMock =
+  getActiveFcmTokens as jest.MockedFunction<typeof getActiveFcmTokens>;
 
 type MockClient = {
   socket: WebSocket;
@@ -57,11 +65,11 @@ describe("notification.service", () => {
     jest.useRealTimers();
   });
 
-  it("envía el alerta cuando se supera el máximo configurado", () => {
+  it("envía el alerta cuando se supera el máximo configurado", async () => {
     const { wss, openClient, closedClient } = createMockServer();
     setAlertThreshold("ESP32_1", "temperature", { max: 25 });
 
-    checkSensorDataForAlerts(wss, {
+    await checkSensorDataForAlerts(wss, {
       deviceId: "ESP32_1",
       sensorType: "temperature",
       value: 26.2,
@@ -88,11 +96,15 @@ describe("notification.service", () => {
         thresholdValue: 25,
         message: expect.stringContaining("Máx"),
         timestamp: "2024-01-01T00:00:00.000Z",
+        tokens: ["token-a", "token-b"],
       })
     );
+    expect(getActiveFcmTokensMock).toHaveBeenCalledWith({
+      deviceId: "ESP32_1",
+    });
   });
 
-  it("respeta el cooldown para evitar spam de alertas", () => {
+  it("respeta el cooldown para evitar spam de alertas", async () => {
     const { wss, openClient } = createMockServer();
     setAlertThreshold("ESP32_1", "humidity", { min: 20 });
 
@@ -103,16 +115,16 @@ describe("notification.service", () => {
       unit: "%",
     };
 
-    checkSensorDataForAlerts(wss, payload);
+    await checkSensorDataForAlerts(wss, payload);
     expect(openClient.send).toHaveBeenCalledTimes(1);
     expect(sendSensorAlertNotificationMock).toHaveBeenCalledTimes(1);
 
-    checkSensorDataForAlerts(wss, payload);
+    await checkSensorDataForAlerts(wss, payload);
     expect(openClient.send).toHaveBeenCalledTimes(1);
     expect(sendSensorAlertNotificationMock).toHaveBeenCalledTimes(1);
 
     jest.advanceTimersByTime(300000);
-    checkSensorDataForAlerts(wss, payload);
+    await checkSensorDataForAlerts(wss, payload);
     expect(openClient.send).toHaveBeenCalledTimes(2);
     expect(sendSensorAlertNotificationMock).toHaveBeenCalledTimes(2);
   });
