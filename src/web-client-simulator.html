@@ -47,6 +47,233 @@
 
       <div class="card mb-4 shadow-sm">
         <div class="card-body">
+          <h5 class="card-title">Configuración del simulador</h5>
+          <form id="settingsForm" class="row g-3 align-items-end">
+            <div class="col-md-4">
+              <label for="apiBaseInput" class="form-label">API Base URL</label>
+              <input
+                type="url"
+                id="apiBaseInput"
+                class="form-control"
+                placeholder="http://localhost:3000/api"
+              />
+            </div>
+            <div class="col-md-4">
+              <label for="wsUrlInput" class="form-label">WebSocket URL</label>
+              <input
+                type="url"
+                id="wsUrlInput"
+                class="form-control"
+                placeholder="ws://localhost:3000"
+              />
+            </div>
+            <div class="col-md-3">
+              <label for="authTokenInput" class="form-label"
+                >Access Token (Bearer)</label
+              >
+              <input
+                type="text"
+                id="authTokenInput"
+                class="form-control"
+                placeholder="jwt..."
+                autocomplete="off"
+              />
+            </div>
+            <div class="col-md-1 d-grid">
+              <button type="submit" class="btn btn-primary mt-4">
+                <i class="bi bi-cloud-check"></i> Guardar
+              </button>
+            </div>
+          </form>
+          <small class="text-muted"
+            >Estos datos se almacenan localmente para reusar el backend y el
+            token en las pruebas.</small
+          >
+        </div>
+      </div>
+
+      <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Inicio de sesión rápido</h5>
+          <p class="text-muted">
+            Ingresa credenciales válidas para solicitar automáticamente un access token y reutilizarlo en todas las llamadas.
+          </p>
+          <form id="loginForm" class="row g-3 align-items-end">
+            <div class="col-md-4">
+              <label for="loginUsernameInput" class="form-label">Usuario</label>
+              <input
+                type="text"
+                id="loginUsernameInput"
+                class="form-control"
+                placeholder="admin"
+                autocomplete="username"
+                required
+              />
+            </div>
+            <div class="col-md-4">
+              <label for="loginPasswordInput" class="form-label">Contraseña</label>
+              <input
+                type="password"
+                id="loginPasswordInput"
+                class="form-control"
+                placeholder="••••••••"
+                autocomplete="current-password"
+                required
+              />
+            </div>
+            <div class="col-md-2 d-grid">
+              <button type="submit" class="btn btn-dark">
+                <i class="bi bi-door-open"></i> Iniciar sesión
+              </button>
+            </div>
+            <div class="col-12">
+              <div id="loginStatus" class="text-muted small"></div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Gestión de plantas (aplica umbrales)</h5>
+          <p class="text-muted">
+            Crea plantas para que el backend configure los umbrales automáticamente.
+            Necesitas un token con rol <code>admin</code>.
+          </p>
+          <form id="plantForm" class="row g-3">
+            <div class="col-md-4">
+              <label for="plantNameInput" class="form-label">Nombre</label>
+              <input
+                type="text"
+                id="plantNameInput"
+                class="form-control"
+                placeholder="Ej: Lavanda demo"
+                required
+              />
+            </div>
+            <div class="col-md-4">
+              <label for="plantDeviceInput" class="form-label"
+                >Dispositivo asignado</label
+              >
+              <input
+                type="text"
+                id="plantDeviceInput"
+                class="form-control"
+                placeholder="ESP32_1"
+                list="devicesDatalist"
+              />
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Umbrales iniciales</label>
+              <div class="small text-muted">
+                Ajusta los valores mínimos/máximos por sensor antes de registrar la planta.
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Sensor</th>
+                      <th>Umbral mínimo</th>
+                      <th>Umbral máximo</th>
+                    </tr>
+                  </thead>
+                  <tbody id="plantThresholdsBody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <button type="submit" class="btn btn-success w-100">
+                <i class="bi bi-plant"></i> Crear planta
+              </button>
+            </div>
+            <div class="col-md-3">
+              <button
+                type="button"
+                id="refreshPlantsBtn"
+                class="btn btn-outline-secondary w-100"
+              >
+                <i class="bi bi-arrow-repeat"></i> Actualizar listado
+              </button>
+            </div>
+            <div class="col-12">
+              <div id="plantStatus" class="text-muted small"></div>
+            </div>
+          </form>
+          <div class="table-responsive mt-3">
+            <table class="table table-bordered table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>Nombre</th>
+                  <th>Dispositivo</th>
+                  <th>Umbrales configurados</th>
+                  <th>Actualización</th>
+                </tr>
+              </thead>
+              <tbody id="plantsTableBody">
+                <tr>
+                  <td colspan="4" class="text-center text-muted">
+                    Aún no hay plantas cargadas.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Registro de tokens FCM</h5>
+          <p class="text-muted">
+            Registra tokens de dispositivos móviles/web para recibir notificaciones push en las pruebas.
+          </p>
+          <form id="fcmForm" class="row g-3 align-items-end">
+            <div class="col-md-4">
+              <label for="fcmTokenInput" class="form-label">Token FCM</label>
+              <input
+                type="text"
+                id="fcmTokenInput"
+                class="form-control"
+                placeholder="token generado por Firebase"
+                required
+              />
+            </div>
+            <div class="col-md-3">
+              <label for="fcmDeviceIdInput" class="form-label">ID de dispositivo</label>
+              <input
+                type="text"
+                id="fcmDeviceIdInput"
+                class="form-control"
+                placeholder="ESP32_1"
+                list="devicesDatalist"
+              />
+            </div>
+            <div class="col-md-3">
+              <label for="fcmPlatformInput" class="form-label">Plataforma</label>
+              <select id="fcmPlatformInput" class="form-select">
+                <option value="">Detectar automáticamente</option>
+                <option value="android">Android</option>
+                <option value="ios">iOS</option>
+                <option value="web">Web</option>
+                <option value="other">Otra</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <button type="submit" class="btn btn-primary w-100">
+                <i class="bi bi-bell-fill"></i> Registrar
+              </button>
+            </div>
+            <div class="col-12">
+              <div id="fcmStatus" class="text-muted small"></div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="card mb-4 shadow-sm">
+        <div class="card-body">
           <h5 class="card-title">Suscripción a Dispositivos</h5>
           <div class="input-group">
             <input
@@ -65,7 +292,7 @@
 
       <div class="card mb-4 shadow-sm">
         <div class="card-body">
-          <h5 class="card-title">Configuración de Umbrales</h5>
+          <h5 class="card-title">Configuración manual de Umbrales</h5>
           <form id="thresholdForm" class="row g-3 align-items-end">
             <div class="col-md-3">
               <label for="thresholdDeviceInput" class="form-label"
@@ -132,7 +359,77 @@
         </div>
       </div>
 
+      <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Simulador de lecturas de sensores</h5>
+          <p class="text-muted">
+            Envía lecturas por WebSocket para disparar los umbrales definidos por tus plantas.
+          </p>
+          <form id="sensorForm" class="row g-3 align-items-end">
+            <div class="col-md-3">
+              <label for="sensorDeviceInput" class="form-label">Dispositivo</label>
+              <input
+                type="text"
+                id="sensorDeviceInput"
+                class="form-control"
+                placeholder="ESP32_1"
+                list="devicesDatalist"
+                required
+              />
+            </div>
+            <div class="col-md-3">
+              <label for="sensorTypeSimulation" class="form-label">Sensor</label>
+              <select id="sensorTypeSimulation" class="form-select">
+                <option value="temperature">Temperatura</option>
+                <option value="humidity">Humedad</option>
+                <option value="soil_humidity">Humedad del Suelo</option>
+                <option value="solar_radiation">Radiación Solar</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label for="sensorValueInput" class="form-label">Valor</label>
+              <input
+                type="number"
+                step="any"
+                id="sensorValueInput"
+                class="form-control"
+                placeholder="Ej: 32"
+                required
+              />
+            </div>
+            <div class="col-md-2">
+              <label for="sensorUnitInput" class="form-label">Unidad</label>
+              <input
+                type="text"
+                id="sensorUnitInput"
+                class="form-control"
+                placeholder="°C"
+              />
+            </div>
+            <div class="col-md-2">
+              <button type="submit" class="btn btn-warning w-100">
+                <i class="bi bi-activity"></i> Enviar lectura
+              </button>
+            </div>
+            <div class="col-12">
+              <div id="sensorStatus" class="text-muted small"></div>
+            </div>
+          </form>
+        </div>
+      </div>
+
       <div id="devices-container"></div>
+
+      <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Alertas recientes</h5>
+          <div id="alertsList" class="list-group small">
+            <div class="list-group-item text-muted text-center">
+              Aún no se han recibido alertas.
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div class="mt-4">
         <h5>Log de Conexión:</h5>
@@ -145,7 +442,6 @@
       const deviceIdInput = document.getElementById("deviceIdInput");
       const subscribeBtn = document.getElementById("subscribeBtn");
       const devicesContainer = document.getElementById("devices-container");
-      const subscribedDevices = new Set();
       const thresholdForm = document.getElementById("thresholdForm");
       const sensorTypeSelect = document.getElementById("sensorTypeSelect");
       const minThresholdInput = document.getElementById("minThresholdInput");
@@ -156,6 +452,38 @@
       const devicesDatalist = document.getElementById("devicesDatalist");
       const minThresholdHelp = document.getElementById("minThresholdHelp");
       const maxThresholdHelp = document.getElementById("maxThresholdHelp");
+      const settingsForm = document.getElementById("settingsForm");
+      const apiBaseInput = document.getElementById("apiBaseInput");
+      const wsUrlInput = document.getElementById("wsUrlInput");
+      const authTokenInput = document.getElementById("authTokenInput");
+      const loginForm = document.getElementById("loginForm");
+      const loginUsernameInput = document.getElementById("loginUsernameInput");
+      const loginPasswordInput = document.getElementById("loginPasswordInput");
+      const loginStatus = document.getElementById("loginStatus");
+      const plantForm = document.getElementById("plantForm");
+      const plantNameInput = document.getElementById("plantNameInput");
+      const plantDeviceInput = document.getElementById("plantDeviceInput");
+      const plantThresholdsBody = document.getElementById(
+        "plantThresholdsBody"
+      );
+      const plantsTableBody = document.getElementById("plantsTableBody");
+      const plantStatus = document.getElementById("plantStatus");
+      const refreshPlantsBtn = document.getElementById("refreshPlantsBtn");
+      const fcmForm = document.getElementById("fcmForm");
+      const fcmTokenInput = document.getElementById("fcmTokenInput");
+      const fcmDeviceIdInput = document.getElementById("fcmDeviceIdInput");
+      const fcmPlatformInput = document.getElementById("fcmPlatformInput");
+      const fcmStatus = document.getElementById("fcmStatus");
+      const sensorForm = document.getElementById("sensorForm");
+      const sensorDeviceInput = document.getElementById("sensorDeviceInput");
+      const sensorTypeSimulation =
+        document.getElementById("sensorTypeSimulation");
+      const sensorValueInput = document.getElementById("sensorValueInput");
+      const sensorUnitInput = document.getElementById("sensorUnitInput");
+      const sensorStatus = document.getElementById("sensorStatus");
+      const alertsList = document.getElementById("alertsList");
+
+      const subscribedDevices = new Set();
 
       const SENSOR_METADATA = {
         temperature: {
@@ -190,7 +518,196 @@
         },
       };
 
+      const STORAGE_KEYS = {
+        apiBase: "simulator.apiBaseUrl",
+        wsUrl: "simulator.wsUrl",
+        token: "simulator.authToken",
+      };
+
+      let apiBaseUrl =
+        window.localStorage.getItem(STORAGE_KEYS.apiBase) ||
+        "http://localhost:3000/api";
+      let wsUrl =
+        window.localStorage.getItem(STORAGE_KEYS.wsUrl) ||
+        "ws://localhost:3000";
+      let authToken =
+        window.localStorage.getItem(STORAGE_KEYS.token) || "";
+
+      if (apiBaseInput) apiBaseInput.value = apiBaseUrl;
+      if (wsUrlInput) wsUrlInput.value = wsUrl;
+      if (authTokenInput) authTokenInput.value = authToken;
+
       const knownDevices = new Set(["ESP32_1", "ESP32_2"]);
+      const pendingWsMessages = [];
+      let socket = null;
+
+      refreshDeviceSuggestions();
+      if (thresholdDeviceInput && !thresholdDeviceInput.value) {
+        thresholdDeviceInput.value = "ESP32_1";
+      }
+      if (plantDeviceInput && !plantDeviceInput.value) {
+        plantDeviceInput.value = "ESP32_1";
+      }
+      if (sensorDeviceInput && !sensorDeviceInput.value) {
+        sensorDeviceInput.value = "ESP32_1";
+      }
+
+      if (sensorTypeSelect) {
+        const currentValue = sensorTypeSelect.value;
+        sensorTypeSelect.innerHTML = Object.entries(SENSOR_METADATA)
+          .map(
+            ([value, meta]) => `<option value="${value}">${meta.name}</option>`
+          )
+          .join("");
+        if (SENSOR_METADATA[currentValue]) {
+          sensorTypeSelect.value = currentValue;
+        }
+        sensorTypeSelect.addEventListener("change", updateThresholdHints);
+      }
+
+      renderPlantThresholdRows();
+      updateThresholdHints();
+      updateSensorSimulationHints();
+      connectWebSocket();
+
+      if (settingsForm) {
+        settingsForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          apiBaseUrl = apiBaseInput.value.trim() || apiBaseUrl;
+          wsUrl = wsUrlInput.value.trim() || wsUrl;
+          authToken = authTokenInput.value.trim();
+
+          window.localStorage.setItem(STORAGE_KEYS.apiBase, apiBaseUrl);
+          window.localStorage.setItem(STORAGE_KEYS.wsUrl, wsUrl);
+          window.localStorage.setItem(STORAGE_KEYS.token, authToken);
+
+          logMessage("Configuración guardada. Reconectando WebSocket...");
+          connectWebSocket();
+        });
+      }
+
+      if (loginForm) {
+        loginForm.addEventListener("submit", handleLoginSubmit);
+      }
+
+      if (subscribeBtn) {
+        subscribeBtn.addEventListener("click", () => {
+          const deviceId = deviceIdInput.value.trim();
+          if (!deviceId) {
+            alert("Introduce un ID de dispositivo.");
+            return;
+          }
+          if (subscribedDevices.has(deviceId)) {
+            logMessage(`Ya estás suscrito a ${deviceId}`);
+            return;
+          }
+
+          sendWsMessage(
+            JSON.stringify({
+              event: "subscribeToDevice",
+              deviceId,
+            })
+          );
+          logMessage(`Suscrito a: ${deviceId}`);
+          registerKnownDevice(deviceId);
+          createDeviceCard(deviceId);
+          subscribedDevices.add(deviceId);
+          deviceIdInput.value = "";
+        });
+
+        deviceIdInput.addEventListener("keyup", (event) => {
+          if (event.key === "Enter") subscribeBtn.click();
+        });
+      }
+
+      if (thresholdForm) {
+        thresholdForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          const meta = SENSOR_METADATA[sensorTypeSelect.value] || {};
+          const deviceIdRaw = thresholdDeviceInput
+            ? thresholdDeviceInput.value.trim()
+            : "";
+          const deviceId = deviceIdRaw || "ESP32_1";
+          const sensorType = sensorTypeSelect.value;
+          const isMinDisabled = !!minThresholdInput?.disabled;
+          const isMaxDisabled = !!maxThresholdInput?.disabled;
+          const minValue = minThresholdInput.value.trim();
+          const maxValue = maxThresholdInput.value.trim();
+
+          const payload = {
+            event: "updateThresholds",
+            sensorType,
+            deviceId,
+          };
+
+          if (!meta.readOnly && !isMinDisabled && minValue !== "") {
+            const parsedMin = Number(minValue);
+            if (Number.isNaN(parsedMin)) {
+              alert("El umbral mínimo debe ser un número válido.");
+              return;
+            }
+            payload.min = parsedMin;
+          }
+
+          if (!meta.readOnly && !isMaxDisabled && maxValue !== "") {
+            const parsedMax = Number(maxValue);
+            if (Number.isNaN(parsedMax)) {
+              alert("El umbral máximo debe ser un número válido.");
+              return;
+            }
+            payload.max = parsedMax;
+          }
+
+          if (
+            payload.min !== undefined &&
+            payload.max !== undefined &&
+            payload.min > payload.max
+          ) {
+            alert("El umbral mínimo no puede ser mayor al máximo.");
+            return;
+          }
+
+          if (meta.readOnly) {
+            logMessage(
+              `El umbral de ${getSensorName(
+                sensorType
+              )} es fijo y no requiere configuración.`
+            );
+            return;
+          }
+
+          registerKnownDevice(deviceId);
+          sendWsMessage(JSON.stringify(payload));
+          logMessage(
+            `Configurando umbrales para ${deviceId} / ${getSensorName(
+              sensorType
+            )}...`
+          );
+        });
+      }
+
+      if (plantForm) {
+        plantForm.addEventListener("submit", handlePlantFormSubmit);
+      }
+
+      if (refreshPlantsBtn) {
+        refreshPlantsBtn.addEventListener("click", loadPlants);
+      }
+
+      if (fcmForm) {
+        fcmForm.addEventListener("submit", handleFcmSubmit);
+      }
+
+      if (sensorForm) {
+        sensorForm.addEventListener("submit", handleSensorFormSubmit);
+      }
+
+      if (sensorTypeSimulation) {
+        sensorTypeSimulation.addEventListener(
+          "change",
+          updateSensorSimulationHints
+        );
+      }
 
       function refreshDeviceSuggestions() {
         if (!devicesDatalist) return;
@@ -210,175 +727,515 @@
         if (thresholdDeviceInput && !thresholdDeviceInput.value) {
           thresholdDeviceInput.value = sanitized;
         }
-      }
-
-      refreshDeviceSuggestions();
-      if (thresholdDeviceInput && !thresholdDeviceInput.value) {
-        thresholdDeviceInput.value = "ESP32_1";
-      }
-
-      if (sensorTypeSelect) {
-        const currentValue = sensorTypeSelect.value;
-        sensorTypeSelect.innerHTML = Object.entries(SENSOR_METADATA)
-          .map(
-            ([value, meta]) => `<option value="${value}">${meta.name}</option>`
-          )
-          .join("");
-        if (SENSOR_METADATA[currentValue]) {
-          sensorTypeSelect.value = currentValue;
+        if (plantDeviceInput && !plantDeviceInput.value) {
+          plantDeviceInput.value = sanitized;
         }
-        sensorTypeSelect.addEventListener("change", updateThresholdHints);
+        if (sensorDeviceInput && !sensorDeviceInput.value) {
+          sensorDeviceInput.value = sanitized;
+        }
       }
 
-      updateThresholdHints();
-
-      // const WS_URL = "ws://98.86.100.220:3000";
-      const WS_URL = "ws://localhost:3000";
-
-      const socket = new WebSocket(WS_URL);
-
-      socket.onopen = () => {
-        logMessage("Conectado al servidor WebSocket.");
-      };
-
-      socket.onclose = (event) => {
-        logMessage(`Desconectado del servidor (${event.code}).`);
-      };
-
-      socket.onerror = (err) => {
-        logMessage(`Error en WebSocket: ${err.message || err}`);
-      };
-
-      socket.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-
-          if (data.event === "newSensorData") {
-            const sensorData = data.data;
-            const { deviceId, sensorType, value, unit } = sensorData;
-            registerKnownDevice(deviceId);
-            updateSensorCard(deviceId, sensorType, value, unit);
-          } else if (data.event === "sensorAlert") {
-            const { deviceId, message } = data;
-            showNotification(`Alerta en ${deviceId}`, message);
-            logMessage(`${message}`);
-          } else if (data.event === "ack") {
-            logMessage(data.message);
-          } else if (data.event === "thresholdsUpdated") {
-            const { deviceId, sensorType, thresholds } = data;
-            registerKnownDevice(deviceId);
-            const sensorLabel = getSensorName(sensorType);
-            const minLabel =
-              thresholds && thresholds.min !== undefined
-                ? formatSensorValue(sensorType, thresholds.min)
-                : "sin mínimo";
-            const maxLabel =
-              thresholds && thresholds.max !== undefined
-                ? formatSensorValue(sensorType, thresholds.max)
-                : "sin máximo";
-            logMessage(
-              `Umbrales para ${deviceId} / ${sensorLabel} actualizados: ${minLabel} / ${maxLabel}`
-            );
-          } else if (data.event === "thresholdUpdateError") {
-            logMessage(`Error al actualizar umbrales: ${data.message}`);
-            alert(data.message);
-          } else if (data.event === "dataError") {
-            logMessage("Error del servidor: " + data.message);
+      function connectWebSocket() {
+        if (socket) {
+          try {
+            socket.close();
+          } catch (error) {
+            console.warn("No se pudo cerrar el socket previo:", error);
           }
-        } catch (err) {
-          console.error("Error procesando mensaje:", err, event.data);
-        }
-      };
-
-      // --- SUSCRIPCIÓN A DISPOSITIVOS ---
-      subscribeBtn.addEventListener("click", () => {
-        const deviceId = deviceIdInput.value.trim();
-        if (!deviceId) return alert("Introduce un ID de dispositivo.");
-        if (subscribedDevices.has(deviceId)) {
-          logMessage(`Ya estás suscrito a ${deviceId}`);
-          return;
         }
 
-        const msg = JSON.stringify({
-          event: "subscribeToDevice",
-          deviceId,
-        });
-        socket.send(msg);
-        logMessage(`Suscrito a: ${deviceId}`);
+        socket = new WebSocket(wsUrl);
 
-        registerKnownDevice(deviceId);
-        createDeviceCard(deviceId);
-        subscribedDevices.add(deviceId);
-        deviceIdInput.value = "";
-      });
-
-      deviceIdInput.addEventListener("keyup", (e) => {
-        if (e.key === "Enter") subscribeBtn.click();
-      });
-
-      thresholdForm.addEventListener("submit", (event) => {
-        event.preventDefault();
-        const meta = SENSOR_METADATA[sensorTypeSelect.value] || {};
-        const deviceIdRaw = thresholdDeviceInput
-          ? thresholdDeviceInput.value.trim()
-          : "";
-        const deviceId = deviceIdRaw || "ESP32_1";
-        const sensorType = sensorTypeSelect.value;
-        const isMinDisabled = !!minThresholdInput?.disabled;
-        const isMaxDisabled = !!maxThresholdInput?.disabled;
-        const minValue = minThresholdInput.value.trim();
-        const maxValue = maxThresholdInput.value.trim();
-
-        const payload = {
-          event: "updateThresholds",
-          sensorType,
-          deviceId,
+        socket.onopen = () => {
+          logMessage(`Conectado al servidor WebSocket (${wsUrl}).`);
+          if (pendingWsMessages.length) {
+            pendingWsMessages.splice(0).forEach((msg) => socket.send(msg));
+          }
         };
 
-        if (!meta.readOnly && !isMinDisabled && minValue !== "") {
-          const parsedMin = Number(minValue);
-          if (Number.isNaN(parsedMin)) {
-            alert("El umbral mínimo debe ser un número válido.");
-            return;
+        socket.onclose = (event) => {
+          logMessage(`Desconectado del servidor (${event.code}).`);
+        };
+
+        socket.onerror = (err) => {
+          logMessage(`Error en WebSocket: ${err.message || err}`);
+        };
+
+        socket.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+
+            if (data.event === "newSensorData") {
+              const sensorData = data.data;
+              const { deviceId, sensorType, value, unit } = sensorData;
+              registerKnownDevice(deviceId);
+              updateSensorCard(deviceId, sensorType, value, unit);
+            } else if (data.event === "sensorAlert") {
+              const { deviceId, message } = data;
+              showNotification(`Alerta en ${deviceId}`, message);
+              logMessage(`${message}`);
+              renderAlertDetails(data);
+            } else if (data.event === "ack") {
+              logMessage(data.message);
+            } else if (data.event === "thresholdsUpdated") {
+              const { deviceId, sensorType, thresholds } = data;
+              registerKnownDevice(deviceId);
+              const sensorLabel = getSensorName(sensorType);
+              const minLabel =
+                thresholds && thresholds.min !== undefined
+                  ? formatSensorValue(sensorType, thresholds.min)
+                  : "sin mínimo";
+              const maxLabel =
+                thresholds && thresholds.max !== undefined
+                  ? formatSensorValue(sensorType, thresholds.max)
+                  : "sin máximo";
+              logMessage(
+                `Umbrales para ${deviceId} / ${sensorLabel} actualizados: ${minLabel} / ${maxLabel}`
+              );
+            } else if (data.event === "thresholdUpdateError") {
+              logMessage(`Error al actualizar umbrales: ${data.message}`);
+              alert(data.message);
+            } else if (data.event === "dataError") {
+              logMessage("Error del servidor: " + data.message);
+            }
+          } catch (err) {
+            console.error("Error procesando mensaje:", err, event.data);
           }
-          payload.min = parsedMin;
-        }
+        };
+      }
 
-        if (!meta.readOnly && !isMaxDisabled && maxValue !== "") {
-          const parsedMax = Number(maxValue);
-          if (Number.isNaN(parsedMax)) {
-            alert("El umbral máximo debe ser un número válido.");
-            return;
-          }
-          payload.max = parsedMax;
-        }
-
-        if (
-          payload.min !== undefined &&
-          payload.max !== undefined &&
-          payload.min > payload.max
-        ) {
-          alert("El umbral mínimo no puede ser mayor al máximo.");
-          return;
-        }
-
-        if (meta.readOnly) {
+      function sendWsMessage(payload) {
+        const serialized =
+          typeof payload === "string" ? payload : JSON.stringify(payload);
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.send(serialized);
+        } else {
+          pendingWsMessages.push(serialized);
           logMessage(
-            `El umbral de ${getSensorName(
-              sensorType
-            )} es fijo y no requiere configuración.`
+            "Socket no disponible, la acción se enviará al reconectar."
           );
+        }
+      }
+
+      function requireAuthToken() {
+        if (!authToken) {
+          alert(
+            "Configura el token de autenticación (Bearer) en la sección de configuración."
+          );
+          return false;
+        }
+        return true;
+      }
+
+      function renderAlertDetails(data) {
+        if (!alertsList) return;
+        if (alertsList.firstElementChild?.classList.contains("text-muted")) {
+          alertsList.innerHTML = "";
+        }
+
+        const item = document.createElement("div");
+        item.className =
+          "list-group-item list-group-item-action flex-column align-items-start";
+
+        const sensorName = getSensorName(data.sensorType);
+        const firedLabel =
+          data.thresholdType === "max" ? "Máximo" : "Mínimo";
+        const thresholdLabel =
+          data.thresholdValue !== undefined
+            ? formatSensorValue(
+                data.sensorType,
+                data.thresholdValue,
+                data.unit
+              )
+            : "sin dato";
+        const readingLabel = formatSensorValue(
+          data.sensorType,
+          data.value,
+          data.unit
+        );
+        const thresholds =
+          data.thresholds && typeof data.thresholds === "object"
+            ? data.thresholds
+            : {};
+        const minThreshold =
+          thresholds.min !== undefined
+            ? formatSensorValue(data.sensorType, thresholds.min, data.unit)
+            : "N/D";
+        const maxThreshold =
+          thresholds.max !== undefined
+            ? formatSensorValue(data.sensorType, thresholds.max, data.unit)
+            : "N/D";
+
+        item.innerHTML = `
+          <div class="d-flex w-100 justify-content-between">
+            <h6 class="mb-1">${sensorName} · Umbral ${firedLabel}</h6>
+            <small>${new Date(data.timestamp).toLocaleTimeString()}</small>
+          </div>
+          <p class="mb-1">${data.message}</p>
+          <small>
+            Dispositivo: <strong>${data.deviceId}</strong> · Planta asociada:
+            <strong>${data.plantName || data.plantId || "sin asociación"}</strong><br/>
+            Lectura: <strong>${readingLabel}</strong> · Disparo: <strong>${thresholdLabel}</strong><br/>
+            Últimos umbrales — Mínimo: ${minThreshold} · Máximo: ${maxThreshold}
+          </small>
+        `;
+
+        alertsList.prepend(item);
+        while (alertsList.childElementCount > 5) {
+          alertsList.removeChild(alertsList.lastElementChild);
+        }
+      }
+
+      async function handleLoginSubmit(event) {
+        event.preventDefault();
+        const username = loginUsernameInput.value.trim();
+        const password = loginPasswordInput.value;
+
+        if (!username || !password) {
+          alert("Debes completar usuario y contraseña.");
           return;
         }
 
-        registerKnownDevice(deviceId);
-        socket.send(JSON.stringify(payload));
-        logMessage(
-          `Configurando umbrales para ${deviceId} / ${getSensorName(
-            sensorType
-          )}...`
+        if (!apiBaseUrl) {
+          alert("Configura la URL base del backend antes de iniciar sesión.");
+          return;
+        }
+
+        if (loginStatus) {
+          loginStatus.textContent = "Solicitando token...";
+          loginStatus.className = "text-muted small";
+        }
+
+        try {
+          const response = await fetch(`${apiBaseUrl}/auth/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password }),
+          });
+
+          const data = await response.json();
+          if (!response.ok || !data?.accessToken) {
+            throw new Error(
+              data?.error || "No se pudo iniciar sesión con esas credenciales."
+            );
+          }
+
+          authToken = data.accessToken;
+          if (authTokenInput) authTokenInput.value = authToken;
+          window.localStorage.setItem(STORAGE_KEYS.token, authToken);
+
+          if (loginStatus) {
+            loginStatus.textContent = "Token obtenido correctamente.";
+            loginStatus.className = "text-success small";
+          }
+
+          await loadPlants();
+        } catch (error) {
+          console.error(error);
+          if (loginStatus) {
+            loginStatus.textContent =
+              error instanceof Error ? error.message : "Error desconocido.";
+            loginStatus.className = "text-danger small";
+          }
+        }
+      }
+
+      async function handlePlantFormSubmit(event) {
+        event.preventDefault();
+        if (!requireAuthToken()) return;
+
+        const name = plantNameInput.value.trim();
+        if (!name) {
+          alert("El nombre de la planta es obligatorio.");
+          return;
+        }
+
+        const deviceId =
+          (plantDeviceInput.value && plantDeviceInput.value.trim()) ||
+          "ESP32_1";
+
+        try {
+          const thresholdsPayload = buildPlantThresholdsPayload();
+          const response = await fetch(`${apiBaseUrl}/plants`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${authToken}`,
+            },
+            body: JSON.stringify({
+              name,
+              deviceId,
+              thresholds: thresholdsPayload,
+            }),
+          });
+
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data?.error || "No se pudo crear la planta.");
+          }
+
+          plantStatus.textContent = `Planta "${data.name}" creada correctamente.`;
+          plantStatus.className = "text-success small";
+          registerKnownDevice(deviceId);
+          await loadPlants();
+        } catch (error) {
+          console.error(error);
+          plantStatus.textContent =
+            error instanceof Error ? error.message : "Error desconocido.";
+          plantStatus.className = "text-danger small";
+        }
+      }
+
+      function buildPlantThresholdsPayload() {
+        const rows = plantThresholdsBody?.querySelectorAll(
+          "[data-sensor-row]"
         );
-      });
+        const payload = {};
+        const errors = [];
+
+        if (!rows) return payload;
+
+        rows.forEach((row) => {
+          const sensor = row.getAttribute("data-sensor");
+          const meta = SENSOR_METADATA[sensor] || {};
+          const minInput = row.querySelector('[data-threshold="min"]');
+          const maxInput = row.querySelector('[data-threshold="max"]');
+          const values = {};
+
+          if (minInput && !minInput.disabled) {
+            const minValue = minInput.value.trim();
+            if (minValue) {
+              const parsed = Number(minValue);
+              if (Number.isNaN(parsed)) {
+                errors.push(`El mínimo para ${meta.name} no es válido.`);
+              } else {
+                values.min = parsed;
+              }
+            }
+          } else if (meta.fixedMin !== undefined) {
+            values.min = meta.fixedMin;
+          }
+
+          if (maxInput && !maxInput.disabled) {
+            const maxValue = maxInput.value.trim();
+            if (maxValue) {
+              const parsed = Number(maxValue);
+              if (Number.isNaN(parsed)) {
+                errors.push(`El máximo para ${meta.name} no es válido.`);
+              } else {
+                values.max = parsed;
+              }
+            }
+          }
+
+          if (Object.keys(values).length === 0) {
+            const example = meta.examples || {};
+            if (example.min !== undefined) values.min = example.min;
+            if (example.max !== undefined) values.max = example.max;
+          }
+
+          payload[sensor] = values;
+        });
+
+        if (errors.length) {
+          throw new Error(errors.join(" "));
+        }
+
+        return payload;
+      }
+
+      function renderPlantThresholdRows() {
+        if (!plantThresholdsBody) return;
+        const rows = Object.entries(SENSOR_METADATA)
+          .map(([sensor, meta]) => {
+            const exampleMin =
+              meta.examples?.min !== undefined ? meta.examples.min : "";
+            const exampleMax =
+              meta.examples?.max !== undefined ? meta.examples.max : "";
+
+            const minField = meta.readOnly
+              ? `<input type="number" class="form-control form-control-sm" data-threshold="min" value="${meta.fixedMin ?? ""}" ${
+                  meta.fixedMin === undefined ? "disabled" : "readonly"
+                } />`
+              : `<input type="number" class="form-control form-control-sm" data-threshold="min" placeholder="${
+                  exampleMin ? `Ej: ${exampleMin}` : "Ej: 15"
+                }" value="${exampleMin !== "" ? exampleMin : ""}" />`;
+
+            const disableMax = meta.readOnly;
+            const maxField = disableMax
+              ? `<input type="text" class="form-control form-control-sm" data-threshold="max" value="No aplica" disabled />`
+              : `<input type="number" class="form-control form-control-sm" data-threshold="max" placeholder="${
+                  exampleMax ? `Ej: ${exampleMax}` : "Ej: 35"
+                }" value="${exampleMax !== "" ? exampleMax : ""}" />`;
+
+            return `<tr data-sensor-row data-sensor="${sensor}">
+              <td>${getSensorName(sensor)}</td>
+              <td>${minField}</td>
+              <td>${maxField}</td>
+            </tr>`;
+          })
+          .join("");
+        plantThresholdsBody.innerHTML = rows;
+      }
+
+      async function loadPlants() {
+        if (!requireAuthToken()) return;
+        if (!plantsTableBody) return;
+
+        plantStatus.textContent = "Cargando plantas...";
+        plantStatus.className = "text-muted small";
+
+        try {
+          const response = await fetch(`${apiBaseUrl}/plants`, {
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+            },
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data?.error || "No se pudieron cargar las plantas.");
+          }
+
+          renderPlantsTable(data);
+          plantStatus.textContent = `Se encontraron ${data.length} planta(s).`;
+          plantStatus.className = "text-success small";
+        } catch (error) {
+          console.error(error);
+          plantStatus.textContent =
+            error instanceof Error ? error.message : "Error desconocido.";
+          plantStatus.className = "text-danger small";
+        }
+      }
+
+      function renderPlantsTable(plants) {
+        if (!plantsTableBody) return;
+        if (!Array.isArray(plants) || !plants.length) {
+          plantsTableBody.innerHTML = `
+            <tr>
+              <td colspan="4" class="text-center text-muted">No hay plantas registradas.</td>
+            </tr>`;
+          return;
+        }
+
+        plantsTableBody.innerHTML = plants
+          .map((plant) => {
+            const thresholdsSummary = Object.keys(SENSOR_METADATA)
+              .map((sensor) => {
+                const meta = SENSOR_METADATA[sensor];
+                const values = plant.thresholds?.[sensor] || {};
+                const minLabel =
+                  values.min !== undefined
+                    ? formatSensorValue(sensor, values.min)
+                    : "—";
+                const maxLabel =
+                  values.max !== undefined
+                    ? formatSensorValue(sensor, values.max)
+                    : "—";
+                return `<div><strong>${meta.name}:</strong> ${minLabel} / ${maxLabel}</div>`;
+              })
+              .join("");
+
+            return `<tr>
+              <td>${plant.name}</td>
+              <td>${plant.deviceId || "ESP32_1"}</td>
+              <td>${thresholdsSummary}</td>
+              <td>${plant.updatedAt ? new Date(plant.updatedAt).toLocaleString() : "—"}</td>
+            </tr>`;
+          })
+          .join("");
+      }
+
+      async function handleFcmSubmit(event) {
+        event.preventDefault();
+        if (!requireAuthToken()) return;
+
+        const token = fcmTokenInput.value.trim();
+        if (!token) {
+          alert("El token FCM es obligatorio.");
+          return;
+        }
+
+        try {
+          const response = await fetch(`${apiBaseUrl}/notifications/tokens`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${authToken}`,
+            },
+            body: JSON.stringify({
+              token,
+              deviceId: fcmDeviceIdInput.value.trim() || undefined,
+              platform: fcmPlatformInput.value || undefined,
+            }),
+          });
+
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data?.error || "No se pudo registrar el token.");
+          }
+
+          fcmStatus.textContent = `Token registrado (ID: ${data.id}).`;
+          fcmStatus.className = "text-success small";
+          registerKnownDevice(data.deviceId || "");
+        } catch (error) {
+          console.error(error);
+          fcmStatus.textContent =
+            error instanceof Error ? error.message : "Error desconocido.";
+          fcmStatus.className = "text-danger small";
+        }
+      }
+
+      function handleSensorFormSubmit(event) {
+        event.preventDefault();
+        const deviceId = sensorDeviceInput.value.trim();
+        const sensorType = sensorTypeSimulation.value;
+        const valueRaw = sensorValueInput.value.trim();
+        const unitValue =
+          sensorUnitInput.value.trim() ||
+          getSensorUnit(sensorType) ||
+          undefined;
+
+        if (!deviceId) {
+          alert("Debes especificar un dispositivo.");
+          return;
+        }
+
+        const parsedValue = Number(valueRaw);
+        if (Number.isNaN(parsedValue)) {
+          alert("El valor debe ser numérico.");
+          return;
+        }
+
+        const payload = [
+          {
+            deviceId,
+            sensorType,
+            value: parsedValue,
+            unit: unitValue || "",
+          },
+        ];
+
+        sendWsMessage(JSON.stringify(payload));
+        sensorStatus.textContent = `Lectura enviada para ${deviceId} / ${getSensorName(
+          sensorType
+        )}.`;
+        sensorStatus.className = "text-success small";
+      }
+
+      function updateSensorSimulationHints() {
+        if (!sensorTypeSimulation) return;
+        const meta = SENSOR_METADATA[sensorTypeSimulation.value] || {};
+        if (sensorUnitInput && meta.unit) {
+          sensorUnitInput.value = meta.unit;
+        }
+        if (sensorValueInput && meta.examples) {
+          if (meta.examples.max !== undefined) {
+            sensorValueInput.placeholder = `Ej: ${meta.examples.max}`;
+          } else if (meta.examples.min !== undefined) {
+            sensorValueInput.placeholder = `Ej: ${meta.examples.min}`;
+          }
+        }
+      }
 
       // --- CREACIÓN DE TARJETAS DE DISPOSITIVOS ---
       function createDeviceCard(deviceId) {
@@ -406,7 +1263,7 @@
 
       function unsubscribe(deviceId) {
         if (!subscribedDevices.has(deviceId)) return;
-        socket.send(
+        sendWsMessage(
           JSON.stringify({ event: "unsubscribeFromDevice", deviceId })
         );
         subscribedDevices.delete(deviceId);
