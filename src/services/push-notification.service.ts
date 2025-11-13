@@ -1,4 +1,5 @@
 import { BatchResponse } from "firebase-admin/messaging";
+import type { SensorThreshold } from "../interfaces/plant.interface";
 import { getFirebaseMessaging } from "../config/firebase-admin";
 
 const DEFAULT_ALERT_TOPIC =
@@ -18,6 +19,9 @@ export interface SensorAlertNotification {
   tokens?: string[];
   topic?: string;
   title?: string;
+  plantId?: string | null;
+  plantName?: string | null;
+  sensorThresholds?: SensorThreshold;
 }
 
 export async function sendSensorAlertNotification(
@@ -30,7 +34,7 @@ export async function sendSensorAlertNotification(
     body: payload.message,
   };
 
-  const data = {
+  const data: Record<string, string> = {
     deviceId: payload.deviceId,
     sensorType: payload.sensorType,
     message: payload.message,
@@ -40,6 +44,22 @@ export async function sendSensorAlertNotification(
     thresholdValue: payload.thresholdValue?.toString() ?? "",
     timestamp: payload.timestamp,
   };
+
+  if (payload.plantId !== undefined && payload.plantId !== null) {
+    data.plantId = payload.plantId;
+  }
+
+  if (payload.plantName !== undefined && payload.plantName !== null) {
+    data.plantName = payload.plantName;
+  }
+
+  if (payload.sensorThresholds?.min !== undefined) {
+    data.sensorThresholdMin = payload.sensorThresholds.min.toString();
+  }
+
+  if (payload.sensorThresholds?.max !== undefined) {
+    data.sensorThresholdMax = payload.sensorThresholds.max.toString();
+  }
 
   if (payload.tokens?.length) {
     return messaging.sendEachForMulticast({

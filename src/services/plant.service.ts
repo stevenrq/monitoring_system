@@ -163,10 +163,15 @@ async function applyPlantThresholds(plant: IPlant | IPlantDocument) {
     return;
   }
 
+  const association = {
+    plantId: getPlantId(plant),
+    plantName: plant.name,
+  };
+
   for (const sensor of SENSOR_TYPES) {
     const thresholds = plant.thresholds[sensor];
     if (thresholds) {
-      setAlertThreshold(deviceId, sensor, thresholds);
+      setAlertThreshold(deviceId, sensor, thresholds, association);
     }
   }
 }
@@ -200,4 +205,15 @@ function normalizeThresholds(thresholds?: PlantThresholds): PlantThresholds {
   }
 
   return normalized;
+}
+
+function getPlantId(
+  plant: IPlant | IPlantDocument
+): string | undefined {
+  const document = plant as Partial<IPlantDocument>;
+  const rawId = document?._id;
+  if (!rawId) {
+    return undefined;
+  }
+  return rawId.toString();
 }

@@ -1,16 +1,12 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { SensorPayload } from "../interfaces/sensor-payload";
+import type { SensorThreshold } from "../interfaces/plant.interface";
 import {
   ThresholdType,
   sendSensorAlertNotification,
   SensorAlertNotification,
 } from "./push-notification.service";
 import { getActiveFcmTokens } from "./fcm-token.service";
-
-interface Threshold {
-  min?: number;
-  max?: number;
-}
 
 /**
  * Últimos tiempos de alerta enviados, para evitar spam (cooldown).
@@ -26,9 +22,21 @@ const ALERT_COOLDOWN_MS = 300000; // 5 minutos
  * Umbrales configurados por el usuario para cada tipo de sensor.
  * Se mantienen en memoria hasta que el proceso se reinicia.
  */
-const alertThresholds: Record<string, Record<string, Threshold>> = {};
+interface SensorThresholdConfig {
+  thresholds: SensorThreshold;
+  plantId?: string | null;
+  plantName?: string | null;
+}
+
+const alertThresholds: Record<string, Record<string, SensorThresholdConfig>> =
+  {};
 
 export const ALERT_ENABLED_DEVICE_IDS = new Set<string>(["ESP32_1"]);
+
+export interface ThresholdAssociationMetadata {
+  plantId?: string | null;
+  plantName?: string | null;
+}
 
 /**
  * Actualiza los umbrales permitidos para un tipo de sensor.
@@ -36,9 +44,10 @@ export const ALERT_ENABLED_DEVICE_IDS = new Set<string>(["ESP32_1"]);
 export function setAlertThreshold(
   deviceId: string,
   sensorType: string,
-  thresholds: Threshold
-): Threshold | undefined {
-  const sanitized: Threshold = {};
+  thresholds: SensorThreshold,
+  association: ThresholdAssociationMetadata = {}
+): SensorThreshold | undefined {
+  const sanitized: SensorThreshold = {};
   const normalizedDeviceId = deviceId.trim();
   const normalizedSensorType = sensorType.trim();
 
@@ -104,8 +113,12 @@ export function setAlertThreshold(
     alertThresholds[normalizedDeviceId] = {};
   }
 
-  alertThresholds[normalizedDeviceId][normalizedSensorType] = sanitized;
-  return alertThresholds[normalizedDeviceId][normalizedSensorType];
+  alertThresholds[normalizedDeviceId][normalizedSensorType] = {
+    thresholds: sanitized,
+    plantId: association.plantId ?? null,
+    plantName: association.plantName ?? null,
+  };
+  return { ...sanitized };
 }
 
 /**
@@ -114,7 +127,7 @@ export function setAlertThreshold(
 export function getAlertThreshold(
   deviceId: string,
   sensorType: string
-): Threshold | undefined {
+): SensorThresholdConfig | undefined {
   return alertThresholds[deviceId]?.[sensorType];
 }
 
@@ -133,7 +146,8 @@ export const checkSensorDataForAlerts = async (
     return;
   }
 
-  const thresholds = getAlertThreshold(deviceId, sensorType);
+  const thresholdConfig = getAlertThreshold(deviceId, sensorType);
+  const thresholds = thresholdConfig?.thresholds;
   if (!thresholds) return;
 
   let alertMessage: string | null = null;
@@ -177,11 +191,30 @@ export const checkSensorDataForAlerts = async (
   console.log(`ALERTA: ${alertMessage}`);
 
   const timestamp = new Date().toISOString();
+
+  const plantId =
+    thresholdConfig?.plantId !== undefined
+      ? thresholdConfig.plantId
+      : null;
+  const plantName =
+    thresholdConfig?.plantName !== undefined
+      ? thresholdConfig.plantName
+      : null;
+  const sensorThresholds = { ...thresholds };
+
   const alertPayload = {
     event: "sensorAlert",
     deviceId,
+    sensorType,
+    value,
+    unit,
     message: alertMessage,
     timestamp,
+    thresholdType: triggeredThresholdType,
+    thresholdValue: triggeredThresholdValue,
+    thresholds: sensorThresholds,
+    plantId,
+    plantName,
   };
 
   // Enviar a todos los clientes conectados
@@ -211,6 +244,9 @@ export const checkSensorDataForAlerts = async (
     thresholdValue: triggeredThresholdValue,
     message: alertMessage,
     timestamp,
+    sensorThresholds,
+    plantId: plantId ?? undefined,
+    plantName: plantName ?? undefined,
   };
 
   if (tokens.length) {

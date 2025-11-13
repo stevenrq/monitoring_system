@@ -67,7 +67,12 @@ describe("notification.service", () => {
 
   it("envía el alerta cuando se supera el máximo configurado", async () => {
     const { wss, openClient, closedClient } = createMockServer();
-    setAlertThreshold("ESP32_1", "temperature", { max: 25 });
+    setAlertThreshold(
+      "ESP32_1",
+      "temperature",
+      { max: 25 },
+      { plantId: "plant-1", plantName: "Lavanda" }
+    );
 
     await checkSensorDataForAlerts(wss, {
       deviceId: "ESP32_1",
@@ -82,8 +87,16 @@ describe("notification.service", () => {
     const payload = JSON.parse(openClient.send.mock.calls[0][0]);
     expect(payload.event).toBe("sensorAlert");
     expect(payload.deviceId).toBe("ESP32_1");
+    expect(payload.sensorType).toBe("temperature");
+    expect(payload.value).toBe(26.2);
+    expect(payload.unit).toBe("°C");
     expect(payload.message).toContain("ha superado el máximo");
     expect(payload.timestamp).toBe("2024-01-01T00:00:00.000Z");
+    expect(payload.thresholdType).toBe("max");
+    expect(payload.thresholdValue).toBe(25);
+    expect(payload.thresholds).toEqual({ max: 25 });
+    expect(payload.plantId).toBe("plant-1");
+    expect(payload.plantName).toBe("Lavanda");
 
     expect(sendSensorAlertNotificationMock).toHaveBeenCalledTimes(1);
     expect(sendSensorAlertNotificationMock).toHaveBeenCalledWith(
@@ -97,6 +110,9 @@ describe("notification.service", () => {
         message: expect.stringContaining("Máx"),
         timestamp: "2024-01-01T00:00:00.000Z",
         tokens: ["token-a", "token-b"],
+        plantId: "plant-1",
+        plantName: "Lavanda",
+        sensorThresholds: { max: 25 },
       })
     );
     expect(getActiveFcmTokensMock).toHaveBeenCalledWith({

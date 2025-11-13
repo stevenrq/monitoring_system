@@ -87,6 +87,9 @@ describe("push-notification.service", () => {
       tokens,
       topic: "custom-topic",
       title: "Título personalizado",
+      plantId: "plant-2",
+      plantName: "Helecho",
+      sensorThresholds: { min: 20, max: 50 },
     });
 
     expect(sendEachForMulticastMock).toHaveBeenCalledTimes(1);
@@ -100,6 +103,10 @@ describe("push-notification.service", () => {
           sensorType: "humidity",
           thresholdType: "min",
           thresholdValue: "20",
+          plantId: "plant-2",
+          plantName: "Helecho",
+          sensorThresholdMin: "20",
+          sensorThresholdMax: "50",
         }),
         tokens,
       })
