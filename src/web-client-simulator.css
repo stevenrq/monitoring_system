@@ -1,0 +1,141 @@
+:root {
+  --sim-bg: #f3f6fb;
+  --sim-panel-bg: #ffffff;
+  --sim-panel-border: #e4e9f2;
+  --sim-accent: #0d6efd;
+  --sim-accent-soft: rgba(13, 110, 253, 0.08);
+  --sim-text-muted: #6c757d;
+  --sim-log-bg: #111827;
+  --sim-log-border: #1f2937;
+  --sim-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+}
+
+body.sim-body {
+  background: radial-gradient(circle at top, #eef1ff 0%, var(--sim-bg) 55%);
+  min-height: 100vh;
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+}
+
+.dashboard-hero h1 {
+  font-weight: 700;
+}
+
+.panel {
+  background: var(--sim-panel-bg);
+  border: 1px solid var(--sim-panel-border);
+  border-radius: 1.25rem;
+  padding: 1.75rem;
+  box-shadow: var(--sim-shadow);
+}
+
+.panel-highlight {
+  border-color: rgba(13, 110, 253, 0.3);
+  box-shadow: 0 20px 45px rgba(13, 110, 253, 0.15);
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.panel-header h5 {
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+}
+
+.subpanel {
+  border: 1px solid var(--sim-panel-border);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  background-color: #fdfdff;
+}
+
+.subpanel-title {
+  font-weight: 600;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+}
+
+.panel-table table {
+  border-radius: 1rem;
+  overflow: hidden;
+}
+
+.panel-table table thead {
+  background: rgba(13, 110, 253, 0.05);
+}
+
+.device-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.device-grid .card {
+  border-radius: 1rem;
+  border: 1px solid var(--sim-panel-border);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.07);
+}
+
+.alert-list .list-group-item {
+  border: none;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  padding: 1rem;
+}
+
+.alert-list .list-group-item:last-child {
+  border-bottom: none;
+}
+
+.log-console {
+  background: var(--sim-log-bg);
+  color: #f9fafb;
+  border-radius: 1rem;
+  min-height: 200px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 1.25rem;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  border: 1px solid var(--sim-log-border);
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.25);
+}
+
+.log-console code {
+  color: #60a5fa;
+}
+
+.panel .form-label {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.panel input,
+.panel select {
+  border-radius: 0.9rem;
+}
+
+.panel button .bi {
+  margin-right: 0.35rem;
+}
+
+.badge {
+  letter-spacing: 0.05em;
+}
+
+.alert-list small {
+  color: var(--sim-text-muted);
+}
+
+@media (max-width: 991px) {
+  .panel {
+    padding: 1.25rem;
+  }
+
+  .dashboard-hero h1 {
+    font-size: 2rem;
+  }
+}

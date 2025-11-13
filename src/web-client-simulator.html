@@ -2,441 +2,631 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta content="width=device-width, initial-scale=1" name="viewport" />
     <title>Dashboard de Monitoreo en Tiempo Real</title>
-    <!-- Bootstrap CSS -->
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
     />
-    <!-- Bootstrap Icons -->
     <link
-      rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+      rel="stylesheet"
     />
-    <style>
-      body {
-        background-color: #f8f9fa;
-      }
-      #logs {
-        border: 1px solid #dee2e6;
-        background-color: #fff;
-        padding: 1rem;
-        height: 150px;
-        overflow-y: scroll;
-        font-family: monospace;
-        font-size: 0.9rem;
-      }
-      .card-header,
-      .card-title {
-        color: #0d6efd;
-      }
-      .badge {
-        transition: background-color 0.3s ease-in-out;
-      }
-    </style>
+    <link href="./web-client-simulator.css" rel="stylesheet" />
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
   </head>
-  <body>
-    <div class="container mt-4">
-      <header class="text-center mb-4">
-        <h1 class="display-5">Dashboard de Monitoreo</h1>
-        <p class="lead">
-          Suscríbete a dispositivos para ver sus datos de sensores en vivo.
+  <body class="sim-body">
+    <div class="container-fluid py-4 px-3 px-xl-5">
+      <header class="dashboard-hero text-center mb-5">
+        <span class="badge text-bg-primary rounded-pill shadow-sm px-3 py-2">
+          Simulador de pruebas
+        </span>
+        <h1 class="mt-3">Panel de monitoreo en tiempo real</h1>
+        <p class="lead text-muted">
+          Configura el backend, gestiona plantas y dispara alertas sin depender
+          del hardware físico.
         </p>
       </header>
 
-      <div class="card mb-4 shadow-sm">
-        <div class="card-body">
-          <h5 class="card-title">Configuración del simulador</h5>
-          <form id="settingsForm" class="row g-3 align-items-end">
-            <div class="col-md-4">
-              <label for="apiBaseInput" class="form-label">API Base URL</label>
-              <input
-                type="url"
-                id="apiBaseInput"
-                class="form-control"
-                placeholder="http://localhost:3000/api"
-              />
-            </div>
-            <div class="col-md-4">
-              <label for="wsUrlInput" class="form-label">WebSocket URL</label>
-              <input
-                type="url"
-                id="wsUrlInput"
-                class="form-control"
-                placeholder="ws://localhost:3000"
-              />
-            </div>
-            <div class="col-md-3">
-              <label for="authTokenInput" class="form-label"
-                >Access Token (Bearer)</label
-              >
-              <input
-                type="text"
-                id="authTokenInput"
-                class="form-control"
-                placeholder="jwt..."
-                autocomplete="off"
-              />
-            </div>
-            <div class="col-md-1 d-grid">
-              <button type="submit" class="btn btn-primary mt-4">
-                <i class="bi bi-cloud-check"></i> Guardar
-              </button>
-            </div>
-          </form>
-          <small class="text-muted"
-            >Estos datos se almacenan localmente para reusar el backend y el
-            token en las pruebas.</small
-          >
-        </div>
-      </div>
-
-      <div class="card mb-4 shadow-sm">
-        <div class="card-body">
-          <h5 class="card-title">Inicio de sesión rápido</h5>
-          <p class="text-muted">
-            Ingresa credenciales válidas para solicitar automáticamente un access token y reutilizarlo en todas las llamadas.
-          </p>
-          <form id="loginForm" class="row g-3 align-items-end">
-            <div class="col-md-4">
-              <label for="loginUsernameInput" class="form-label">Usuario</label>
-              <input
-                type="text"
-                id="loginUsernameInput"
-                class="form-control"
-                placeholder="admin"
-                autocomplete="username"
-                required
-              />
-            </div>
-            <div class="col-md-4">
-              <label for="loginPasswordInput" class="form-label">Contraseña</label>
-              <input
-                type="password"
-                id="loginPasswordInput"
-                class="form-control"
-                placeholder="••••••••"
-                autocomplete="current-password"
-                required
-              />
-            </div>
-            <div class="col-md-2 d-grid">
-              <button type="submit" class="btn btn-dark">
-                <i class="bi bi-door-open"></i> Iniciar sesión
-              </button>
-            </div>
-            <div class="col-12">
-              <div id="loginStatus" class="text-muted small"></div>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <div class="card mb-4 shadow-sm">
-        <div class="card-body">
-          <h5 class="card-title">Gestión de plantas (aplica umbrales)</h5>
-          <p class="text-muted">
-            Crea plantas para que el backend configure los umbrales automáticamente.
-            Necesitas un token con rol <code>admin</code>.
-          </p>
-          <form id="plantForm" class="row g-3">
-            <div class="col-md-4">
-              <label for="plantNameInput" class="form-label">Nombre</label>
-              <input
-                type="text"
-                id="plantNameInput"
-                class="form-control"
-                placeholder="Ej: Lavanda demo"
-                required
-              />
-            </div>
-            <div class="col-md-4">
-              <label for="plantDeviceInput" class="form-label"
-                >Dispositivo asignado</label
-              >
-              <input
-                type="text"
-                id="plantDeviceInput"
-                class="form-control"
-                placeholder="ESP32_1"
-                list="devicesDatalist"
-              />
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">Umbrales iniciales</label>
-              <div class="small text-muted">
-                Ajusta los valores mínimos/máximos por sensor antes de registrar la planta.
+      <div class="row g-4">
+        <div class="col-12 col-xxl-7 d-flex flex-column gap-4">
+          <section class="panel panel-highlight">
+            <div class="panel-header">
+              <div>
+                <h5>Conexión y autenticación</h5>
+                <p class="text-muted mb-0">
+                  Define la API, WebSocket y obtén un token válido para probar
+                  los servicios protegidos.
+                </p>
               </div>
             </div>
-            <div class="col-12">
-              <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
-                  <thead>
-                    <tr>
-                      <th>Sensor</th>
-                      <th>Umbral mínimo</th>
-                      <th>Umbral máximo</th>
-                    </tr>
-                  </thead>
-                  <tbody id="plantThresholdsBody"></tbody>
-                </table>
+            <div class="row g-4">
+              <div class="col-lg-6">
+                <div class="subpanel">
+                  <div class="subpanel-title">
+                    <i class="bi bi-diagram-3 text-primary me-2"></i>Backend &
+                    WebSocket
+                  </div>
+                  <form class="row g-3 align-items-end" id="settingsForm">
+                    <div class="col-12">
+                      <label class="form-label" for="apiBaseInput"
+                        >API Base URL</label
+                      >
+                      <input
+                        class="form-control"
+                        id="apiBaseInput"
+                        placeholder="http://localhost:3000/api"
+                        type="url"
+                      />
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label" for="wsUrlInput"
+                        >WebSocket URL</label
+                      >
+                      <input
+                        class="form-control"
+                        id="wsUrlInput"
+                        placeholder="ws://localhost:3000"
+                        type="url"
+                      />
+                    </div>
+                    <div class="col-9">
+                      <label class="form-label" for="authTokenInput"
+                        >Access Token (Bearer)</label
+                      >
+                      <input
+                        autocomplete="off"
+                        class="form-control"
+                        id="authTokenInput"
+                        placeholder="jwt..."
+                        type="text"
+                      />
+                    </div>
+                    <div class="col-3 d-grid">
+                      <button class="btn btn-primary" type="submit">
+                        <i class="bi bi-cloud-check"></i> Guardar
+                      </button>
+                    </div>
+                  </form>
+                  <small class="text-muted"
+                    >Los cambios se almacenan en tu navegador.</small
+                  >
+                </div>
+              </div>
+              <div class="col-lg-6">
+                <div class="subpanel h-100">
+                  <div class="subpanel-title">
+                    <i class="bi bi-shield-lock text-primary me-2"></i>Inicio de
+                    sesión rápido
+                  </div>
+                  <form class="row g-3 align-items-end" id="loginForm">
+                    <div class="col-12">
+                      <label class="form-label" for="loginUsernameInput"
+                        >Usuario</label
+                      >
+                      <input
+                        autocomplete="username"
+                        class="form-control"
+                        id="loginUsernameInput"
+                        placeholder="admin"
+                        required
+                        type="text"
+                      />
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label" for="loginPasswordInput"
+                        >Contraseña</label
+                      >
+                      <input
+                        autocomplete="current-password"
+                        class="form-control"
+                        id="loginPasswordInput"
+                        placeholder="••••••••"
+                        required
+                        type="password"
+                      />
+                    </div>
+                    <div class="col-12 d-grid">
+                      <button class="btn btn-dark" type="submit">
+                        <i class="bi bi-door-open"></i> Iniciar sesión
+                      </button>
+                    </div>
+                    <div class="col-12">
+                      <div class="text-muted small" id="loginStatus"></div>
+                    </div>
+                  </form>
+                </div>
               </div>
             </div>
-            <div class="col-md-3">
-              <button type="submit" class="btn btn-success w-100">
-                <i class="bi bi-plant"></i> Crear planta
-              </button>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h5>Cliente FCM integrado</h5>
+                <p class="text-muted mb-0">
+                  Inicializa Firebase, solicita permisos y genera tokens web sin
+                  salir del panel.
+                </p>
+              </div>
             </div>
-            <div class="col-md-3">
-              <button
-                type="button"
-                id="refreshPlantsBtn"
-                class="btn btn-outline-secondary w-100"
-              >
-                <i class="bi bi-arrow-repeat"></i> Actualizar listado
-              </button>
+            <form class="row g-3" id="firebaseConfigForm">
+              <div class="col-md-6 col-xl-4">
+                <label class="form-label" for="firebaseApiKeyInput"
+                  >API Key</label
+                >
+                <input
+                  class="form-control"
+                  id="firebaseApiKeyInput"
+                  placeholder="AIza..."
+                  type="text"
+                />
+              </div>
+              <div class="col-md-6 col-xl-4">
+                <label class="form-label" for="firebaseAuthDomainInput"
+                  >Auth Domain</label
+                >
+                <input
+                  class="form-control"
+                  id="firebaseAuthDomainInput"
+                  placeholder="mi-app.firebaseapp.com"
+                  type="text"
+                />
+              </div>
+              <div class="col-md-6 col-xl-4">
+                <label class="form-label" for="firebaseProjectIdInput"
+                  >Project ID</label
+                >
+                <input
+                  class="form-control"
+                  id="firebaseProjectIdInput"
+                  placeholder="mi-app"
+                  type="text"
+                />
+              </div>
+              <div class="col-md-6 col-xl-4">
+                <label class="form-label" for="firebaseStorageBucketInput"
+                  >Storage Bucket</label
+                >
+                <input
+                  class="form-control"
+                  id="firebaseStorageBucketInput"
+                  placeholder="mi-app.appspot.com"
+                  type="text"
+                />
+              </div>
+              <div class="col-md-6 col-xl-4">
+                <label class="form-label" for="firebaseSenderIdInput"
+                  >Messaging Sender ID</label
+                >
+                <input
+                  class="form-control"
+                  id="firebaseSenderIdInput"
+                  placeholder="1234567890"
+                  type="text"
+                />
+              </div>
+              <div class="col-md-6 col-xl-4">
+                <label class="form-label" for="firebaseAppIdInput"
+                  >App ID</label
+                >
+                <input
+                  class="form-control"
+                  id="firebaseAppIdInput"
+                  placeholder="1:1234567890:web:abc123"
+                  type="text"
+                />
+              </div>
+              <div class="col-md-6 col-xl-4">
+                <label class="form-label" for="firebaseMeasurementIdInput"
+                  >Measurement ID (opcional)</label
+                >
+                <input
+                  class="form-control"
+                  id="firebaseMeasurementIdInput"
+                  placeholder="G-XXXXXXX"
+                  type="text"
+                />
+              </div>
+              <div class="col-md-6 col-xl-4">
+                <label class="form-label" for="firebaseVapidKeyInput"
+                  >VAPID key pública</label
+                >
+                <input
+                  class="form-control"
+                  id="firebaseVapidKeyInput"
+                  placeholder="BNc..."
+                  type="text"
+                />
+              </div>
+              <div class="col-md-6 col-xl-4 d-grid">
+                <button class="btn btn-outline-primary mt-md-4" type="submit">
+                  <i class="bi bi-save2"></i> Guardar configuración
+                </button>
+              </div>
+            </form>
+            <div class="row g-3 align-items-end mt-1">
+              <div class="col-md-4 d-grid">
+                <button class="btn btn-primary" id="firebaseInitBtn">
+                  <i class="bi bi-rocket"></i> Inicializar cliente
+                </button>
+              </div>
+              <div class="col-md-4 d-grid">
+                <button
+                  class="btn btn-outline-secondary"
+                  id="firebasePermissionBtn"
+                >
+                  <i class="bi bi-bell"></i> Solicitar permiso
+                </button>
+              </div>
+              <div class="col-md-4 d-grid">
+                <button class="btn btn-success" id="firebaseGetTokenBtn">
+                  <i class="bi bi-cloud-arrow-down"></i> Obtener token web
+                </button>
+              </div>
+              <div class="col-12">
+                <div class="text-muted small" id="firebaseStatus"></div>
+              </div>
             </div>
-            <div class="col-12">
-              <div id="plantStatus" class="text-muted small"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h5>Gestión de plantas y umbrales</h5>
+                <p class="text-muted mb-0">
+                  Aplica los umbrales a cada sensor y mantenlos sincronizados
+                  con el motor de alertas.
+                </p>
+              </div>
             </div>
-          </form>
-          <div class="table-responsive mt-3">
-            <table class="table table-bordered table-hover">
-              <thead class="table-light">
-                <tr>
-                  <th>Nombre</th>
-                  <th>Dispositivo</th>
-                  <th>Umbrales configurados</th>
-                  <th>Actualización</th>
-                </tr>
-              </thead>
-              <tbody id="plantsTableBody">
-                <tr>
-                  <td colspan="4" class="text-center text-muted">
-                    Aún no hay plantas cargadas.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+            <form class="row g-3" id="plantForm">
+              <div class="col-md-4">
+                <label class="form-label" for="plantNameInput">Nombre</label>
+                <input
+                  class="form-control"
+                  id="plantNameInput"
+                  placeholder="Ej: Lavanda demo"
+                  required
+                  type="text"
+                />
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="plantDeviceInput"
+                  >Dispositivo asignado</label
+                >
+                <input
+                  class="form-control"
+                  id="plantDeviceInput"
+                  list="devicesDatalist"
+                  placeholder="ESP32_1"
+                  type="text"
+                />
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Umbrales iniciales</label>
+                <div class="small text-muted">
+                  Ajusta los valores por sensor antes de registrar la planta.
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="table-responsive panel-table">
+                  <table class="table table-sm align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>Sensor</th>
+                        <th>Umbral mínimo</th>
+                        <th>Umbral máximo</th>
+                      </tr>
+                    </thead>
+                    <tbody id="plantThresholdsBody"></tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <button class="btn btn-success w-100" type="submit">
+                  <i class="bi bi-plant"></i> Crear planta
+                </button>
+              </div>
+              <div class="col-md-3">
+                <button
+                  class="btn btn-outline-secondary w-100"
+                  id="refreshPlantsBtn"
+                  type="button"
+                >
+                  <i class="bi bi-arrow-repeat"></i> Actualizar listado
+                </button>
+              </div>
+              <div class="col-12">
+                <div class="text-muted small" id="plantStatus"></div>
+              </div>
+            </form>
+            <div class="table-responsive panel-table mt-3">
+              <table class="table table-bordered align-middle mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Dispositivo</th>
+                    <th>Umbrales configurados</th>
+                    <th>Actualización</th>
+                  </tr>
+                </thead>
+                <tbody id="plantsTableBody">
+                  <tr>
+                    <td class="text-center text-muted" colspan="4">
+                      Aún no hay plantas cargadas.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h5>Registro de tokens FCM</h5>
+                <p class="text-muted mb-0">
+                  Asocia tokens de Android, iOS o web al backend para recibir
+                  alertas push.
+                </p>
+              </div>
+            </div>
+            <form class="row g-3 align-items-end" id="fcmForm">
+              <div class="col-md-4">
+                <label class="form-label" for="fcmTokenInput">Token FCM</label>
+                <input
+                  class="form-control"
+                  id="fcmTokenInput"
+                  placeholder="token generado por Firebase"
+                  required
+                  type="text"
+                />
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="fcmDeviceIdInput"
+                  >ID de dispositivo</label
+                >
+                <input
+                  class="form-control"
+                  id="fcmDeviceIdInput"
+                  list="devicesDatalist"
+                  placeholder="ESP32_1"
+                  type="text"
+                />
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="fcmPlatformInput"
+                  >Plataforma</label
+                >
+                <select class="form-select" id="fcmPlatformInput">
+                  <option value="">Detectar automáticamente</option>
+                  <option value="android">Android</option>
+                  <option value="ios">iOS</option>
+                  <option value="web">Web</option>
+                  <option value="other">Otra</option>
+                </select>
+              </div>
+              <div class="col-md-2">
+                <button class="btn btn-primary w-100" type="submit">
+                  <i class="bi bi-bell-fill"></i> Registrar
+                </button>
+              </div>
+              <div class="col-12">
+                <div class="text-muted small" id="fcmStatus"></div>
+              </div>
+            </form>
+          </section>
         </div>
-      </div>
 
-      <div class="card mb-4 shadow-sm">
-        <div class="card-body">
-          <h5 class="card-title">Registro de tokens FCM</h5>
-          <p class="text-muted">
-            Registra tokens de dispositivos móviles/web para recibir notificaciones push en las pruebas.
-          </p>
-          <form id="fcmForm" class="row g-3 align-items-end">
-            <div class="col-md-4">
-              <label for="fcmTokenInput" class="form-label">Token FCM</label>
-              <input
-                type="text"
-                id="fcmTokenInput"
-                class="form-control"
-                placeholder="token generado por Firebase"
-                required
-              />
+        <div class="col-12 col-xxl-5 d-flex flex-column gap-4">
+          <section class="panel h-100">
+            <div class="panel-header">
+              <div>
+                <h5>Operaciones en tiempo real</h5>
+                <p class="text-muted mb-0">
+                  Suscríbete, ajusta umbrales o envía lecturas para disparar
+                  alertas.
+                </p>
+              </div>
             </div>
-            <div class="col-md-3">
-              <label for="fcmDeviceIdInput" class="form-label">ID de dispositivo</label>
-              <input
-                type="text"
-                id="fcmDeviceIdInput"
-                class="form-control"
-                placeholder="ESP32_1"
-                list="devicesDatalist"
-              />
+            <div class="subpanel mb-3">
+              <div class="subpanel-title">
+                <i class="bi bi-plug text-primary me-2"></i>Suscripción a
+                dispositivos
+              </div>
+              <div class="input-group">
+                <input
+                  class="form-control"
+                  id="deviceIdInput"
+                  placeholder="Ej: ESP32_1 o ESP32_2"
+                  type="text"
+                  value="ESP32_1"
+                />
+                <button class="btn btn-primary" id="subscribeBtn">
+                  <i class="bi bi-plus-circle"></i> Suscribirse
+                </button>
+              </div>
             </div>
-            <div class="col-md-3">
-              <label for="fcmPlatformInput" class="form-label">Plataforma</label>
-              <select id="fcmPlatformInput" class="form-select">
-                <option value="">Detectar automáticamente</option>
-                <option value="android">Android</option>
-                <option value="ios">iOS</option>
-                <option value="web">Web</option>
-                <option value="other">Otra</option>
-              </select>
+            <div class="subpanel mb-3">
+              <div class="subpanel-title">
+                <i class="bi bi-sliders text-primary me-2"></i>Configuración
+                manual de umbrales
+              </div>
+              <form class="row g-3 align-items-end" id="thresholdForm">
+                <div class="col-lg-4">
+                  <label class="form-label" for="thresholdDeviceInput"
+                    >Dispositivo</label
+                  >
+                  <input
+                    class="form-control"
+                    id="thresholdDeviceInput"
+                    list="devicesDatalist"
+                    placeholder="ESP32_1"
+                    type="text"
+                  />
+                  <datalist id="devicesDatalist"></datalist>
+                </div>
+                <div class="col-lg-4">
+                  <label class="form-label" for="sensorTypeSelect"
+                    >Sensor</label
+                  >
+                  <select class="form-select" id="sensorTypeSelect">
+                    <option value="temperature">Temperatura</option>
+                    <option value="humidity">Humedad</option>
+                    <option value="soil_humidity">Humedad del Suelo</option>
+                    <option value="solar_radiation">Radiación Solar</option>
+                  </select>
+                </div>
+                <div class="col-lg-2">
+                  <label class="form-label" for="minThresholdInput"
+                    >Mínimo</label
+                  >
+                  <input
+                    class="form-control"
+                    id="minThresholdInput"
+                    placeholder="Ej: 15"
+                    step="any"
+                    type="number"
+                  />
+                </div>
+                <div class="col-lg-2">
+                  <label class="form-label" for="maxThresholdInput"
+                    >Máximo</label
+                  >
+                  <input
+                    class="form-control"
+                    id="maxThresholdInput"
+                    placeholder="Ej: 35"
+                    step="any"
+                    type="number"
+                  />
+                </div>
+                <div class="col-12 d-flex flex-column flex-md-row gap-3">
+                  <small class="text-muted flex-fill" id="minThresholdHelp">
+                    Define el mínimo permitido.
+                  </small>
+                  <small class="text-muted flex-fill" id="maxThresholdHelp">
+                    Define el máximo permitido.
+                  </small>
+                </div>
+                <div class="col-md-3 ms-auto">
+                  <button class="btn btn-success w-100" type="submit">
+                    <i class="bi bi-save"></i> Guardar
+                  </button>
+                </div>
+              </form>
             </div>
-            <div class="col-md-2">
-              <button type="submit" class="btn btn-primary w-100">
-                <i class="bi bi-bell-fill"></i> Registrar
-              </button>
+            <div class="subpanel">
+              <div class="subpanel-title">
+                <i class="bi bi-activity text-primary me-2"></i>Simulador de
+                lecturas
+              </div>
+              <p class="text-muted small mb-3">
+                Envía lecturas por WebSocket para disparar los umbrales
+                definidos por tus plantas con el fin de probar las
+                notificaciones.
+              </p>
+              <form class="row g-3 align-items-end" id="sensorForm">
+                <div class="col-lg-4">
+                  <label class="form-label" for="sensorDeviceInput"
+                    >Dispositivo</label
+                  >
+                  <input
+                    class="form-control"
+                    id="sensorDeviceInput"
+                    list="devicesDatalist"
+                    placeholder="ESP32_1"
+                    required
+                    type="text"
+                  />
+                </div>
+                <div class="col-lg-4">
+                  <label class="form-label" for="sensorTypeSimulation"
+                    >Sensor</label
+                  >
+                  <select class="form-select" id="sensorTypeSimulation">
+                    <option value="temperature">Temperatura</option>
+                    <option value="humidity">Humedad</option>
+                    <option value="soil_humidity">Humedad del Suelo</option>
+                    <option value="solar_radiation">Radiación Solar</option>
+                  </select>
+                </div>
+                <div class="col-lg-2">
+                  <label class="form-label" for="sensorValueInput">Valor</label>
+                  <input
+                    class="form-control"
+                    id="sensorValueInput"
+                    placeholder="Ej: 32"
+                    required
+                    step="any"
+                    type="number"
+                  />
+                </div>
+                <div class="col-lg-2">
+                  <label class="form-label" for="sensorUnitInput">Unidad</label>
+                  <input
+                    class="form-control"
+                    id="sensorUnitInput"
+                    placeholder="°C"
+                    type="text"
+                  />
+                </div>
+                <div class="col-md-3 ms-auto">
+                  <button class="btn btn-warning w-100" type="submit">
+                    <i class="bi bi-send"></i> Enviar
+                  </button>
+                </div>
+                <div class="col-12">
+                  <div class="text-muted small" id="sensorStatus"></div>
+                </div>
+              </form>
             </div>
-            <div class="col-12">
-              <div id="fcmStatus" class="text-muted small"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h5>Dispositivos suscritos</h5>
+                <p class="text-muted mb-0">
+                  Visualiza las últimas lecturas recibidas.
+                </p>
+              </div>
             </div>
-          </form>
+            <div class="device-grid" id="devices-container"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h5>Alertas recientes</h5>
+                <p class="text-muted mb-0">
+                  Incluye el contexto de la planta y el umbral disparado.
+                </p>
+              </div>
+            </div>
+            <div class="list-group small alert-list" id="alertsList">
+              <div class="list-group-item text-muted text-center">
+                Aún no se han recibido alertas.
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h5>Bitácora en vivo</h5>
+                <p class="text-muted mb-0">
+                  Revisa las acciones y eventos recibidos del servidor.
+                </p>
+              </div>
+            </div>
+            <div class="log-console" id="logs"></div>
+          </section>
         </div>
-      </div>
-
-      <div class="card mb-4 shadow-sm">
-        <div class="card-body">
-          <h5 class="card-title">Suscripción a Dispositivos</h5>
-          <div class="input-group">
-            <input
-              type="text"
-              id="deviceIdInput"
-              class="form-control"
-              placeholder="Ej: ESP32_1 o ESP32_2"
-              value="ESP32_1"
-            />
-            <button id="subscribeBtn" class="btn btn-primary">
-              <i class="bi bi-plus-circle"></i> Suscribirse
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div class="card mb-4 shadow-sm">
-        <div class="card-body">
-          <h5 class="card-title">Configuración manual de Umbrales</h5>
-          <form id="thresholdForm" class="row g-3 align-items-end">
-            <div class="col-md-3">
-              <label for="thresholdDeviceInput" class="form-label"
-                >Dispositivo</label
-              >
-              <input
-                type="text"
-                id="thresholdDeviceInput"
-                class="form-control"
-                placeholder="Ej: ESP32_1"
-                list="devicesDatalist"
-              />
-              <datalist id="devicesDatalist"></datalist>
-            </div>
-            <div class="col-md-3">
-              <label for="sensorTypeSelect" class="form-label">Sensor</label>
-              <select id="sensorTypeSelect" class="form-select">
-                <option value="temperature">Temperatura</option>
-                <option value="humidity">Humedad</option>
-                <option value="soil_humidity">Humedad del Suelo</option>
-                <option value="solar_radiation">Radiación Solar</option>
-              </select>
-            </div>
-            <div class="col-md-2">
-              <label for="minThresholdInput" class="form-label"
-                >Umbral Mínimo</label
-              >
-              <input
-                type="number"
-                step="any"
-                id="minThresholdInput"
-                class="form-control"
-                placeholder="Ej: 15"
-              />
-              <small id="minThresholdHelp" class="form-text text-muted">
-                Define el mínimo permitido para el sensor seleccionado.
-              </small>
-            </div>
-            <div class="col-md-2">
-              <label for="maxThresholdInput" class="form-label"
-                >Umbral Máximo</label
-              >
-              <input
-                type="number"
-                step="any"
-                id="maxThresholdInput"
-                class="form-control"
-                placeholder="Ej: 35"
-              />
-              <small id="maxThresholdHelp" class="form-text text-muted">
-                Define el máximo permitido para el sensor seleccionado.
-              </small>
-            </div>
-            <div class="col-md-2">
-              <button type="submit" class="btn btn-success w-100 mt-4 mt-md-0">
-                <i class="bi bi-save"></i> Guardar
-              </button>
-            </div>
-          </form>
-          <small class="text-muted"
-            >Deja en blanco un valor para quitar el umbral
-            correspondiente.</small
-          >
-        </div>
-      </div>
-
-      <div class="card mb-4 shadow-sm">
-        <div class="card-body">
-          <h5 class="card-title">Simulador de lecturas de sensores</h5>
-          <p class="text-muted">
-            Envía lecturas por WebSocket para disparar los umbrales definidos por tus plantas.
-          </p>
-          <form id="sensorForm" class="row g-3 align-items-end">
-            <div class="col-md-3">
-              <label for="sensorDeviceInput" class="form-label">Dispositivo</label>
-              <input
-                type="text"
-                id="sensorDeviceInput"
-                class="form-control"
-                placeholder="ESP32_1"
-                list="devicesDatalist"
-                required
-              />
-            </div>
-            <div class="col-md-3">
-              <label for="sensorTypeSimulation" class="form-label">Sensor</label>
-              <select id="sensorTypeSimulation" class="form-select">
-                <option value="temperature">Temperatura</option>
-                <option value="humidity">Humedad</option>
-                <option value="soil_humidity">Humedad del Suelo</option>
-                <option value="solar_radiation">Radiación Solar</option>
-              </select>
-            </div>
-            <div class="col-md-2">
-              <label for="sensorValueInput" class="form-label">Valor</label>
-              <input
-                type="number"
-                step="any"
-                id="sensorValueInput"
-                class="form-control"
-                placeholder="Ej: 32"
-                required
-              />
-            </div>
-            <div class="col-md-2">
-              <label for="sensorUnitInput" class="form-label">Unidad</label>
-              <input
-                type="text"
-                id="sensorUnitInput"
-                class="form-control"
-                placeholder="°C"
-              />
-            </div>
-            <div class="col-md-2">
-              <button type="submit" class="btn btn-warning w-100">
-                <i class="bi bi-activity"></i> Enviar lectura
-              </button>
-            </div>
-            <div class="col-12">
-              <div id="sensorStatus" class="text-muted small"></div>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <div id="devices-container"></div>
-
-      <div class="card mb-4 shadow-sm">
-        <div class="card-body">
-          <h5 class="card-title">Alertas recientes</h5>
-          <div id="alertsList" class="list-group small">
-            <div class="list-group-item text-muted text-center">
-              Aún no se han recibido alertas.
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="mt-4">
-        <h5>Log de Conexión:</h5>
-        <div id="logs"></div>
       </div>
     </div>
-
     <script>
       const logs = document.getElementById("logs");
       const deviceIdInput = document.getElementById("deviceIdInput");
@@ -447,7 +637,7 @@
       const minThresholdInput = document.getElementById("minThresholdInput");
       const maxThresholdInput = document.getElementById("maxThresholdInput");
       const thresholdDeviceInput = document.getElementById(
-        "thresholdDeviceInput"
+        "thresholdDeviceInput",
       );
       const devicesDatalist = document.getElementById("devicesDatalist");
       const minThresholdHelp = document.getElementById("minThresholdHelp");
@@ -460,11 +650,42 @@
       const loginUsernameInput = document.getElementById("loginUsernameInput");
       const loginPasswordInput = document.getElementById("loginPasswordInput");
       const loginStatus = document.getElementById("loginStatus");
+      const firebaseConfigForm = document.getElementById("firebaseConfigForm");
+      const firebaseStatus = document.getElementById("firebaseStatus");
+      const firebaseInitBtn = document.getElementById("firebaseInitBtn");
+      const firebasePermissionBtn = document.getElementById(
+        "firebasePermissionBtn",
+      );
+      const firebaseGetTokenBtn = document.getElementById(
+        "firebaseGetTokenBtn",
+      );
+      const firebaseApiKeyInput = document.getElementById(
+        "firebaseApiKeyInput",
+      );
+      const firebaseAuthDomainInput = document.getElementById(
+        "firebaseAuthDomainInput",
+      );
+      const firebaseProjectIdInput = document.getElementById(
+        "firebaseProjectIdInput",
+      );
+      const firebaseStorageBucketInput = document.getElementById(
+        "firebaseStorageBucketInput",
+      );
+      const firebaseSenderIdInput = document.getElementById(
+        "firebaseSenderIdInput",
+      );
+      const firebaseAppIdInput = document.getElementById("firebaseAppIdInput");
+      const firebaseMeasurementIdInput = document.getElementById(
+        "firebaseMeasurementIdInput",
+      );
+      const firebaseVapidKeyInput = document.getElementById(
+        "firebaseVapidKeyInput",
+      );
       const plantForm = document.getElementById("plantForm");
       const plantNameInput = document.getElementById("plantNameInput");
       const plantDeviceInput = document.getElementById("plantDeviceInput");
       const plantThresholdsBody = document.getElementById(
-        "plantThresholdsBody"
+        "plantThresholdsBody",
       );
       const plantsTableBody = document.getElementById("plantsTableBody");
       const plantStatus = document.getElementById("plantStatus");
@@ -476,8 +697,9 @@
       const fcmStatus = document.getElementById("fcmStatus");
       const sensorForm = document.getElementById("sensorForm");
       const sensorDeviceInput = document.getElementById("sensorDeviceInput");
-      const sensorTypeSimulation =
-        document.getElementById("sensorTypeSimulation");
+      const sensorTypeSimulation = document.getElementById(
+        "sensorTypeSimulation",
+      );
       const sensorValueInput = document.getElementById("sensorValueInput");
       const sensorUnitInput = document.getElementById("sensorUnitInput");
       const sensorStatus = document.getElementById("sensorStatus");
@@ -518,10 +740,23 @@
         },
       };
 
+      const DEFAULT_FIREBASE_CONFIG = {
+        apiKey: "AIzaSyBRftDkf-IAl4RB_8xhFKUJsLxuO9ysiyc",
+        authDomain: "monitoring-system-f50e6.firebaseapp.com",
+        projectId: "monitoring-system-f50e6",
+        storageBucket: "monitoring-system-f50e6.firebasestorage.app",
+        messagingSenderId: "350176906989",
+        appId: "1:350176906989:web:c0b4b7e723f1003fa406e4",
+        measurementId: "G-GB0XYE79W2",
+      };
+      const DEFAULT_FIREBASE_VAPID_KEY = "";
+
       const STORAGE_KEYS = {
         apiBase: "simulator.apiBaseUrl",
         wsUrl: "simulator.wsUrl",
         token: "simulator.authToken",
+        firebaseConfig: "simulator.firebaseConfig",
+        firebaseVapid: "simulator.firebaseVapidKey",
       };
 
       let apiBaseUrl =
@@ -530,8 +765,15 @@
       let wsUrl =
         window.localStorage.getItem(STORAGE_KEYS.wsUrl) ||
         "ws://localhost:3000";
-      let authToken =
-        window.localStorage.getItem(STORAGE_KEYS.token) || "";
+      let authToken = window.localStorage.getItem(STORAGE_KEYS.token) || "";
+      let firebaseClientConfig = loadStoredFirebaseConfig();
+      let firebaseVapidKey =
+        window.localStorage.getItem(STORAGE_KEYS.firebaseVapid) ||
+        DEFAULT_FIREBASE_VAPID_KEY;
+
+      if (!firebaseClientConfig) {
+        firebaseClientConfig = { ...DEFAULT_FIREBASE_CONFIG };
+      }
 
       if (apiBaseInput) apiBaseInput.value = apiBaseUrl;
       if (wsUrlInput) wsUrlInput.value = wsUrl;
@@ -539,6 +781,15 @@
 
       const knownDevices = new Set(["ESP32_1", "ESP32_2"]);
       const pendingWsMessages = [];
+      let firebaseMessagingInstance = null;
+      let firebaseServiceWorkerRegistration = null;
+      let firebaseInitializationInProgress = false;
+
+      populateFirebaseInputs(firebaseClientConfig);
+      if (firebaseVapidKeyInput && firebaseVapidKey) {
+        firebaseVapidKeyInput.value = firebaseVapidKey;
+      }
+
       let socket = null;
 
       refreshDeviceSuggestions();
@@ -556,7 +807,7 @@
         const currentValue = sensorTypeSelect.value;
         sensorTypeSelect.innerHTML = Object.entries(SENSOR_METADATA)
           .map(
-            ([value, meta]) => `<option value="${value}">${meta.name}</option>`
+            ([value, meta]) => `<option value="${value}">${meta.name}</option>`,
           )
           .join("");
         if (SENSOR_METADATA[currentValue]) {
@@ -590,6 +841,92 @@
         loginForm.addEventListener("submit", handleLoginSubmit);
       }
 
+      if (firebaseConfigForm) {
+        firebaseConfigForm.addEventListener(
+          "submit",
+          handleFirebaseConfigSubmit,
+        );
+      }
+
+      if (firebaseInitBtn) {
+        firebaseInitBtn.addEventListener("click", async () => {
+          if (firebaseStatus) {
+            firebaseStatus.textContent = "Inicializando cliente Firebase...";
+            firebaseStatus.className = "text-muted small";
+          }
+          try {
+            await initializeFirebaseClient();
+            if (firebaseStatus) {
+              firebaseStatus.textContent =
+                "Firebase Messaging inicializado correctamente.";
+              firebaseStatus.className = "text-success small";
+            }
+          } catch (error) {
+            console.error(error);
+            if (firebaseStatus) {
+              firebaseStatus.textContent =
+                error instanceof Error
+                  ? error.message
+                  : "No se pudo inicializar Firebase.";
+              firebaseStatus.className = "text-danger small";
+            }
+          }
+        });
+      }
+
+      if (firebasePermissionBtn) {
+        firebasePermissionBtn.addEventListener("click", async () => {
+          try {
+            await handleRequestNotificationPermission();
+            if (firebaseStatus) {
+              firebaseStatus.textContent =
+                "Permiso de notificaciones otorgado.";
+              firebaseStatus.className = "text-success small";
+            }
+          } catch (error) {
+            if (firebaseStatus) {
+              firebaseStatus.textContent =
+                error instanceof Error ? error.message : "Permiso rechazado.";
+              firebaseStatus.className = "text-danger small";
+            }
+          }
+        });
+      }
+
+      if (firebaseGetTokenBtn) {
+        firebaseGetTokenBtn.addEventListener("click", async () => {
+          if (firebaseStatus) {
+            firebaseStatus.textContent =
+              "Obteniendo token web (esto puede demorar unos segundos)...";
+            firebaseStatus.className = "text-muted small";
+          }
+          try {
+            const token = await handleGetBrowserFcmToken();
+            if (fcmTokenInput && token) {
+              fcmTokenInput.value = token;
+            }
+            if (firebaseStatus) {
+              firebaseStatus.textContent = "Token web generado correctamente.";
+              firebaseStatus.className = "text-success small";
+            }
+            if (fcmStatus) {
+              fcmStatus.textContent =
+                "Token rellenado automáticamente. Puedes registrarlo en la tarjeta inferior.";
+              fcmStatus.className = "text-success small";
+            }
+          } catch (error) {
+            console.error(error);
+            if (firebaseStatus) {
+              firebaseStatus.textContent =
+                error instanceof Error
+                  ? error.message
+                  : "No se pudo obtener el token.";
+              firebaseStatus.className = "text-danger small";
+            }
+          }
+        });
+      }
+
       if (subscribeBtn) {
         subscribeBtn.addEventListener("click", () => {
           const deviceId = deviceIdInput.value.trim();
@@ -606,7 +943,7 @@
             JSON.stringify({
               event: "subscribeToDevice",
               deviceId,
-            })
+            }),
           );
           logMessage(`Suscrito a: ${deviceId}`);
           registerKnownDevice(deviceId);
@@ -670,8 +1007,8 @@
           if (meta.readOnly) {
             logMessage(
               `El umbral de ${getSensorName(
-                sensorType
-              )} es fijo y no requiere configuración.`
+                sensorType,
+              )} es fijo y no requiere configuración.`,
             );
             return;
           }
@@ -680,8 +1017,8 @@
           sendWsMessage(JSON.stringify(payload));
           logMessage(
             `Configurando umbrales para ${deviceId} / ${getSensorName(
-              sensorType
-            )}...`
+              sensorType,
+            )}...`,
           );
         });
       }
@@ -705,7 +1042,7 @@
       if (sensorTypeSimulation) {
         sensorTypeSimulation.addEventListener(
           "change",
-          updateSensorSimulationHints
+          updateSensorSimulationHints,
         );
       }
 
@@ -790,7 +1127,7 @@
                   ? formatSensorValue(sensorType, thresholds.max)
                   : "sin máximo";
               logMessage(
-                `Umbrales para ${deviceId} / ${sensorLabel} actualizados: ${minLabel} / ${maxLabel}`
+                `Umbrales para ${deviceId} / ${sensorLabel} actualizados: ${minLabel} / ${maxLabel}`,
               );
             } else if (data.event === "thresholdUpdateError") {
               logMessage(`Error al actualizar umbrales: ${data.message}`);
@@ -812,7 +1149,7 @@
         } else {
           pendingWsMessages.push(serialized);
           logMessage(
-            "Socket no disponible, la acción se enviará al reconectar."
+            "Socket no disponible, la acción se enviará al reconectar.",
           );
         }
       }
@@ -820,7 +1157,7 @@
       function requireAuthToken() {
         if (!authToken) {
           alert(
-            "Configura el token de autenticación (Bearer) en la sección de configuración."
+            "Configura el token de autenticación (Bearer) en la sección de configuración.",
           );
           return false;
         }
@@ -838,20 +1175,15 @@
           "list-group-item list-group-item-action flex-column align-items-start";
 
         const sensorName = getSensorName(data.sensorType);
-        const firedLabel =
-          data.thresholdType === "max" ? "Máximo" : "Mínimo";
+        const firedLabel = data.thresholdType === "max" ? "Máximo" : "Mínimo";
         const thresholdLabel =
           data.thresholdValue !== undefined
-            ? formatSensorValue(
-                data.sensorType,
-                data.thresholdValue,
-                data.unit
-              )
+            ? formatSensorValue(data.sensorType, data.thresholdValue, data.unit)
             : "sin dato";
         const readingLabel = formatSensorValue(
           data.sensorType,
           data.value,
-          data.unit
+          data.unit,
         );
         const thresholds =
           data.thresholds && typeof data.thresholds === "object"
@@ -916,7 +1248,7 @@
           const data = await response.json();
           if (!response.ok || !data?.accessToken) {
             throw new Error(
-              data?.error || "No se pudo iniciar sesión con esas credenciales."
+              data?.error || "No se pudo iniciar sesión con esas credenciales.",
             );
           }
 
@@ -938,6 +1270,220 @@
             loginStatus.className = "text-danger small";
           }
         }
+      }
+
+      function handleFirebaseConfigSubmit(event) {
+        event.preventDefault();
+        try {
+          const config = getFirebaseConfigFromInputs();
+          firebaseClientConfig = config;
+          saveFirebaseConfig(config);
+          firebaseStatus.textContent = "Configuración guardada.";
+          firebaseStatus.className = "text-success small";
+        } catch (error) {
+          console.error(error);
+          if (firebaseStatus) {
+            firebaseStatus.textContent =
+              error instanceof Error
+                ? error.message
+                : "No se pudo guardar la configuración.";
+            firebaseStatus.className = "text-danger small";
+          }
+        }
+      }
+
+      function saveFirebaseConfig(config) {
+        if (!config) return;
+        window.localStorage.setItem(
+          STORAGE_KEYS.firebaseConfig,
+          JSON.stringify(config),
+        );
+      }
+
+      function loadStoredFirebaseConfig() {
+        const raw = window.localStorage.getItem(STORAGE_KEYS.firebaseConfig);
+        if (!raw) return null;
+        try {
+          const parsed = JSON.parse(raw);
+          return typeof parsed === "object" && parsed ? parsed : null;
+        } catch (error) {
+          console.warn(
+            "No se pudo parsear la configuración Firebase guardada.",
+          );
+          return null;
+        }
+      }
+
+      function populateFirebaseInputs(config) {
+        if (!config) return;
+        if (firebaseApiKeyInput)
+          firebaseApiKeyInput.value = config.apiKey ?? "";
+        if (firebaseAuthDomainInput)
+          firebaseAuthDomainInput.value = config.authDomain ?? "";
+        if (firebaseProjectIdInput)
+          firebaseProjectIdInput.value = config.projectId ?? "";
+        if (firebaseStorageBucketInput)
+          firebaseStorageBucketInput.value = config.storageBucket ?? "";
+        if (firebaseSenderIdInput)
+          firebaseSenderIdInput.value = config.messagingSenderId ?? "";
+        if (firebaseAppIdInput) firebaseAppIdInput.value = config.appId ?? "";
+        if (firebaseMeasurementIdInput)
+          firebaseMeasurementIdInput.value = config.measurementId ?? "";
+      }
+
+      function getFirebaseConfigFromInputs() {
+        const config = {
+          apiKey: firebaseApiKeyInput?.value.trim(),
+          authDomain: firebaseAuthDomainInput?.value.trim(),
+          projectId: firebaseProjectIdInput?.value.trim(),
+          storageBucket: firebaseStorageBucketInput?.value.trim(),
+          messagingSenderId: firebaseSenderIdInput?.value.trim(),
+          appId: firebaseAppIdInput?.value.trim(),
+          measurementId: firebaseMeasurementIdInput?.value.trim(),
+        };
+
+        const missing = Object.entries(config)
+          .filter(([key, value]) => {
+            if (key === "measurementId") return false;
+            return !value;
+          })
+          .map(([key]) => key);
+
+        if (missing.length) {
+          throw new Error(
+            `Faltan campos obligatorios de Firebase: ${missing.join(", ")}`,
+          );
+        }
+
+        if (!config.measurementId) {
+          delete config.measurementId;
+        }
+
+        return config;
+      }
+
+      async function initializeFirebaseClient() {
+        if (!window.firebase) {
+          throw new Error("El SDK de Firebase no se ha cargado correctamente.");
+        }
+
+        if (firebaseInitializationInProgress) {
+          return firebaseMessagingInstance;
+        }
+
+        firebaseInitializationInProgress = true;
+        try {
+          const config = firebaseClientConfig || getFirebaseConfigFromInputs();
+
+          firebaseClientConfig = config;
+          saveFirebaseConfig(config);
+
+          if (!firebase.apps.length) {
+            firebase.initializeApp(config);
+          }
+
+          firebaseMessagingInstance = firebase.messaging();
+          firebaseServiceWorkerRegistration =
+            await registerMessagingServiceWorker(config);
+
+          return firebaseMessagingInstance;
+        } finally {
+          firebaseInitializationInProgress = false;
+        }
+      }
+
+      async function ensureFirebaseInitialized() {
+        if (firebaseMessagingInstance) {
+          return firebaseMessagingInstance;
+        }
+        return initializeFirebaseClient();
+      }
+
+      async function registerMessagingServiceWorker(config) {
+        if (!("serviceWorker" in navigator)) {
+          throw new Error(
+            "El navegador no soporta Service Workers, no se puede usar FCM web.",
+          );
+        }
+
+        const registration = await navigator.serviceWorker.register(
+          "./firebase-messaging-sw.js",
+          {
+            scope: "./",
+          },
+        );
+
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          void sendConfigToServiceWorker(config).catch((error) =>
+            console.error("No se pudo reenviar la configuración a SW:", error),
+          );
+        });
+
+        await navigator.serviceWorker.ready;
+        await sendConfigToServiceWorker(config);
+        return registration;
+      }
+
+      async function sendConfigToServiceWorker(config) {
+        const message = { type: "INIT_FIREBASE", config };
+        if (navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage(message);
+        }
+        try {
+          const readyRegistration = await navigator.serviceWorker.ready;
+          readyRegistration.active?.postMessage(message);
+        } catch (error) {
+          console.warn(
+            "No se pudo notificar al Service Worker sobre Firebase:",
+            error,
+          );
+        }
+      }
+
+      async function handleRequestNotificationPermission() {
+        if (!("Notification" in window)) {
+          throw new Error("El navegador no soporta notificaciones.");
+        }
+        if (Notification.permission === "granted") {
+          return;
+        }
+        const permission = await Notification.requestPermission();
+        if (permission !== "granted") {
+          throw new Error("Debes otorgar permiso para recibir notificaciones.");
+        }
+      }
+
+      async function handleGetBrowserFcmToken() {
+        const messaging = await ensureFirebaseInitialized();
+        await handleRequestNotificationPermission();
+
+        let vapidKeyValue = firebaseVapidKeyInput?.value.trim();
+        if (vapidKeyValue) {
+          window.localStorage.setItem(
+            STORAGE_KEYS.firebaseVapid,
+            vapidKeyValue,
+          );
+          firebaseVapidKey = vapidKeyValue;
+        } else if (firebaseVapidKey) {
+          vapidKeyValue = firebaseVapidKey;
+        }
+
+        const registration =
+          firebaseServiceWorkerRegistration ||
+          (await navigator.serviceWorker.ready);
+
+        const token = await messaging.getToken({
+          vapidKey: vapidKeyValue || undefined,
+          serviceWorkerRegistration: registration,
+        });
+
+        if (!token) {
+          throw new Error(
+            "Firebase Messaging no devolvió un token. Verifica la configuración y el dominio.",
+          );
+        }
+
+        return token;
       }
 
       async function handlePlantFormSubmit(event) {
@@ -987,9 +1533,7 @@
       }
 
       function buildPlantThresholdsPayload() {
-        const rows = plantThresholdsBody?.querySelectorAll(
-          "[data-sensor-row]"
-        );
+        const rows = plantThresholdsBody?.querySelectorAll("[data-sensor-row]");
         const payload = {};
         const errors = [];
 
@@ -1093,7 +1637,9 @@
           });
           const data = await response.json();
           if (!response.ok) {
-            throw new Error(data?.error || "No se pudieron cargar las plantas.");
+            throw new Error(
+              data?.error || "No se pudieron cargar las plantas.",
+            );
           }
 
           renderPlantsTable(data);
@@ -1217,7 +1763,7 @@
 
         sendWsMessage(JSON.stringify(payload));
         sensorStatus.textContent = `Lectura enviada para ${deviceId} / ${getSensorName(
-          sensorType
+          sensorType,
         )}.`;
         sensorStatus.className = "text-success small";
       }
@@ -1264,7 +1810,7 @@
       function unsubscribe(deviceId) {
         if (!subscribedDevices.has(deviceId)) return;
         sendWsMessage(
-          JSON.stringify({ event: "unsubscribeFromDevice", deviceId })
+          JSON.stringify({ event: "unsubscribeFromDevice", deviceId }),
         );
         subscribedDevices.delete(deviceId);
         document.getElementById(`device-${deviceId}`)?.remove();
@@ -1279,7 +1825,7 @@
         if (!sensorList) return;
 
         let sensorItem = document.getElementById(
-          `sensor-${deviceId}-${sensorType}`
+          `sensor-${deviceId}-${sensorType}`,
         );
 
         if (!sensorItem) {
@@ -1299,13 +1845,13 @@
           sensorList.appendChild(sensorItem);
         } else {
           const badge = document.getElementById(
-            `value-${deviceId}-${sensorType}`
+            `value-${deviceId}-${sensorType}`,
           );
           badge.textContent = formatSensorValue(sensorType, value, unit);
           badge.classList.replace("bg-primary", "bg-success");
           setTimeout(
             () => badge.classList.replace("bg-success", "bg-primary"),
-            500
+            500,
           );
         }
       }
