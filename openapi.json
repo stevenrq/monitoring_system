@@ -1706,6 +1706,76 @@
         }
       }
     },
+    "/api/reports/weekly": {
+      "get": {
+        "tags": [
+          "Reportes"
+        ],
+        "summary": "Promedios de sensores en los últimos 7 días",
+        "description": "Devuelve los promedios ponderados por sensor tomando como base los registros horarios almacenados en la última semana (o el número de días indicado). Este recurso es útil para tarjetas de resumen o widgets que muestran tendencias recientes sin descargar todo el historial.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador del dispositivo que se desea consultar.",
+            "example": "ESP32_1"
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30
+            },
+            "description": "Cantidad de días a promediar (por defecto 7).",
+            "example": 7
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Promedios calculados correctamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklySensorAveragesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Parámetros inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/reports/hourly/recalculate": {
       "post": {
         "tags": [
@@ -2818,6 +2888,146 @@
               "Tpro": 23.5
             }
           ]
+        }
+      },
+      "WeeklySensorAverageEntry": {
+        "type": "object",
+        "properties": {
+          "sensorType": {
+            "type": "string",
+            "enum": [
+              "temperature",
+              "humidity",
+              "soil_humidity",
+              "solar_radiation"
+            ],
+            "example": "temperature"
+          },
+          "average": {
+            "type": "number",
+            "example": 23.5
+          },
+          "samples": {
+            "type": "integer",
+            "example": 168
+          },
+          "units": {
+            "type": "string",
+            "nullable": true,
+            "example": "°C"
+          }
+        }
+      },
+      "WeeklySensorAveragesResponse": {
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "example": "ESP32_1"
+          },
+          "days": {
+            "type": "integer",
+            "example": 7
+          },
+          "range": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "string",
+                "example": "2025-11-02T00:00:00Z"
+              },
+              "to": {
+                "type": "string",
+                "example": "2025-11-09T00:00:00Z"
+              }
+            }
+          },
+          "sensors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WeeklySensorAverageEntry"
+            }
+          },
+          "daily": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WeeklySensorDailyEntry"
+            }
+          }
+        },
+        "example": {
+          "deviceId": "ESP32_1",
+          "days": 7,
+          "range": {
+            "from": "2025-11-02T00:00:00Z",
+            "to": "2025-11-09T00:00:00Z"
+          },
+          "sensors": [
+            {
+              "sensorType": "temperature",
+              "average": 23.33,
+              "samples": 168,
+              "units": "°C"
+            },
+            {
+              "sensorType": "humidity",
+              "average": 61.2,
+              "samples": 168,
+              "units": "%"
+            }
+          ],
+          "daily": [
+            {
+              "date": "2025-11-08T00:00:00Z",
+              "weekday": 6,
+              "weekdayName": "Sábado",
+              "sensors": [
+                {
+                  "sensorType": "temperature",
+                  "average": 21.9,
+                  "samples": 24,
+                  "units": "°C"
+                },
+                {
+                  "sensorType": "humidity",
+                  "average": 70.1,
+                  "samples": 24,
+                  "units": "%"
+                }
+              ]
+            },
+            {
+              "date": "2025-11-09T00:00:00Z",
+              "weekday": 7,
+              "weekdayName": "Domingo",
+              "sensors": []
+            }
+          ]
+        }
+      },
+      "WeeklySensorDailyEntry": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "example": "2025-11-08T00:00:00Z"
+          },
+          "weekday": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 7,
+            "example": 6
+          },
+          "weekdayName": {
+            "type": "string",
+            "example": "Sábado"
+          },
+          "sensors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WeeklySensorAverageEntry"
+            }
+          }
         }
       },
       "HourlyRecalculateRequest": {

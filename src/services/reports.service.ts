@@ -1,5 +1,6 @@
 import { PipelineStage, FilterQuery } from "mongoose";
 import { DateTime } from "luxon";
+import { SENSOR_TYPES, type SensorType } from "../constants/sensor-types";
 import SensorDataModel from "../models/sensor-data.model";
 import HourlyAverageModel, {
   IHourlyAverage,
@@ -10,12 +11,9 @@ const REPORT_TIMEZONE = "UTC";
 const HOURS_IN_DAY = 24;
 const MAX_HOURLY_RANGE_DAYS = 92;
 const DEFAULT_DECIMALS = 2;
-
-type SensorType =
-  | "temperature"
-  | "humidity"
-  | "soil_humidity"
-  | "solar_radiation";
+const DEFAULT_WEEKLY_DAYS = 7;
+const MAX_WEEKLY_DAYS = 30;
+const SENSOR_TYPE_SET = new Set<SensorType>(SENSOR_TYPES);
 
 interface HourlyAggregationResult {
   deviceId: string;
@@ -100,6 +98,31 @@ export interface MonthlyReportPayload {
   year: number;
   month: number;
   days: MonthlyDay[];
+}
+
+export interface WeeklySensorAverageEntry {
+  sensorType: SensorType;
+  average: number;
+  samples: number;
+  units?: string;
+}
+
+export interface WeeklySensorDailySummary {
+  date: string;
+  weekday: number;
+  weekdayName: string;
+  sensors: WeeklySensorAverageEntry[];
+}
+
+export interface WeeklySensorAveragesPayload {
+  deviceId: string;
+  days: number;
+  range: {
+    from: string;
+    to: string;
+  };
+  sensors: WeeklySensorAverageEntry[];
+  daily: WeeklySensorDailySummary[];
 }
 
 type HourlyAverageRecord = Pick<
@@ -391,6 +414,72 @@ const computeAverage = (values: number[]): number | undefined => {
   return sum / values.length;
 };
 
+interface WeeklyAccumulator {
+  weightedSum: number;
+  weight: number;
+  samples: number;
+  units?: string;
+}
+
+interface WeeklyDaySlot {
+  key: string;
+  date: string;
+  weekday: number;
+  weekdayName: string;
+  buckets: Map<SensorType, WeeklyAccumulator>;
+}
+
+const isSensorType = (value: string): value is SensorType =>
+  SENSOR_TYPE_SET.has(value as SensorType);
+
+const buildWeekdayName = (dateTime: DateTime): string => {
+  const label = dateTime.setLocale("es").toFormat("cccc");
+  if (!label) return "";
+  return label.charAt(0).toUpperCase() + label.slice(1);
+};
+
+const buildSensorEntries = (
+  source: Map<SensorType, WeeklyAccumulator>
+): WeeklySensorAverageEntry[] =>
+  Array.from(source.entries())
+    .filter(([, bucket]) => bucket.weight > 0)
+    .map(([sensorType, bucket]) => ({
+      sensorType,
+      average: roundMetric(bucket.weightedSum / bucket.weight) as number,
+      samples: bucket.samples,
+      units: bucket.units,
+    }))
+    .sort(
+      (a, b) =>
+        SENSOR_TYPES.indexOf(a.sensorType) - SENSOR_TYPES.indexOf(b.sensorType)
+    );
+
+const buildWeeklyDaySlots = (
+  endDate: Date,
+  days: number
+): WeeklyDaySlot[] => {
+  const endDay = DateTime.fromJSDate(endDate, {
+    zone: REPORT_TIMEZONE,
+  }).startOf("day");
+
+  return Array.from({ length: days }, (_, index) => {
+    const offset = days - index - 1;
+    const day = endDay.minus({ days: offset });
+    const isoDate = day.toISODate();
+    if (!isoDate) {
+      throw new Error("No se pudo formatear la fecha diaria en ISO.");
+    }
+
+    return {
+      key: isoDate,
+      date: toUtcISO(day.toJSDate()),
+      weekday: day.weekday,
+      weekdayName: buildWeekdayName(day),
+      buckets: new Map<SensorType, WeeklyAccumulator>(),
+    };
+  });
+};
+
 const markTemperatureExtremes = (
   rows: DailyReportRow[],
   tmax?: number,
@@ -593,5 +682,119 @@ export const getMonthlyReport = async (
     year,
     month,
     days,
+  };
+};
+
+export const getWeeklySensorAverages = async (
+  deviceId: string,
+  options?: { days?: number; referenceDate?: Date }
+): Promise<WeeklySensorAveragesPayload> => {
+  const requestedDays =
+    options?.days !== undefined ? options.days : DEFAULT_WEEKLY_DAYS;
+
+  if (requestedDays < 1 || requestedDays > MAX_WEEKLY_DAYS) {
+    throw new Error(
+      `El parámetro 'days' debe estar entre 1 y ${MAX_WEEKLY_DAYS}.`
+    );
+  }
+
+  const reference = DateTime.fromJSDate(options?.referenceDate ?? new Date(), {
+    zone: REPORT_TIMEZONE,
+  });
+
+  const toDate = reference.toJSDate();
+  const fromDate = reference.minus({ days: requestedDays }).toJSDate();
+
+  const rawDocs = await HourlyAverageModel.find({
+    deviceId,
+    hour: { $gte: fromDate, $lte: toDate },
+  })
+    .sort({ hour: 1 })
+    .lean<HourlyAverageRecord>()
+    .exec();
+
+  const docs = rawDocs as unknown as HourlyAverageRecord[];
+
+  const buckets = new Map<SensorType, WeeklyAccumulator>();
+  const daySlots = buildWeeklyDaySlots(toDate, requestedDays);
+  const daySlotMap = new Map(daySlots.map((slot) => [slot.key, slot]));
+
+  docs.forEach((doc) => {
+    if (!isSensorType(doc.sensorType)) {
+      return;
+    }
+
+    const bucket =
+      buckets.get(doc.sensorType) ?? {
+        weightedSum: 0,
+        weight: 0,
+        samples: 0,
+        units: doc.units,
+      };
+
+    const samples = typeof doc.samples === "number" ? doc.samples : 0;
+    const weight = samples > 0 ? samples : 1;
+
+    bucket.weightedSum += doc.avg * weight;
+    bucket.weight += weight;
+    bucket.samples += samples;
+
+    if (!bucket.units && doc.units) {
+      bucket.units = doc.units;
+    }
+
+    buckets.set(doc.sensorType, bucket);
+
+    const dayKey = DateTime.fromJSDate(doc.hour, {
+      zone: REPORT_TIMEZONE,
+    })
+      .startOf("day")
+      .toISODate();
+
+    if (!dayKey) {
+      return;
+    }
+
+    const slot = daySlotMap.get(dayKey);
+    if (!slot) {
+      return;
+    }
+
+    const dayBucket =
+      slot.buckets.get(doc.sensorType) ?? {
+        weightedSum: 0,
+        weight: 0,
+        samples: 0,
+        units: doc.units,
+      };
+
+    dayBucket.weightedSum += doc.avg * weight;
+    dayBucket.weight += weight;
+    dayBucket.samples += samples;
+
+    if (!dayBucket.units && doc.units) {
+      dayBucket.units = doc.units;
+    }
+
+    slot.buckets.set(doc.sensorType, dayBucket);
+  });
+
+  const sensors = buildSensorEntries(buckets);
+  const daily = daySlots.map((slot) => ({
+    date: slot.date,
+    weekday: slot.weekday,
+    weekdayName: slot.weekdayName,
+    sensors: buildSensorEntries(slot.buckets),
+  }));
+
+  return {
+    deviceId,
+    days: requestedDays,
+    range: {
+      from: toUtcISO(fromDate),
+      to: toUtcISO(toDate),
+    },
+    sensors,
+    daily,
   };
 };

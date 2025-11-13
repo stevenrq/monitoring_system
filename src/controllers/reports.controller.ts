@@ -6,6 +6,7 @@ import {
   getDailyReport,
   getHourlyReport,
   getMonthlyReport,
+  getWeeklySensorAverages,
   upsertHourlyAverages,
 } from "../services/reports.service";
 
@@ -101,6 +102,16 @@ const monthlyQuerySchema = z.object({
     .int()
     .min(1, "El mes debe estar entre 1 y 12.")
     .max(12, "El mes debe estar entre 1 y 12."),
+});
+
+const weeklyQuerySchema = z.object({
+  deviceId: z.string().trim().min(1, "deviceId es requerido"),
+  days: z
+    .coerce.number()
+    .int()
+    .min(1, "Los días deben ser >= 1.")
+    .max(30, "Los días deben ser <= 30.")
+    .optional(),
 });
 
 const respondWithValidationError = (res: Response, error: z.ZodError) => {
@@ -220,6 +231,32 @@ export const dailyReportHandler = async (req: Request, res: Response) => {
       return res.status(400).json({ error: error.message });
     }
     return res.status(500).json({ error: "Error desconocido al generar el reporte diario." });
+  }
+};
+
+/**
+ * Controlador para `GET /api/reports/weekly`.
+ * Devuelve los promedios ponderados por sensor de los últimos N días (7 por defecto).
+ */
+export const weeklyAveragesHandler = async (req: Request, res: Response) => {
+  const decodedQuery = decodeQueryParams(req.query);
+  const result = weeklyQuerySchema.safeParse(decodedQuery);
+  if (!result.success) {
+    return respondWithValidationError(res, result.error);
+  }
+
+  try {
+    const payload = await getWeeklySensorAverages(result.data.deviceId, {
+      days: result.data.days,
+    });
+    return res.status(200).json(payload);
+  } catch (error) {
+    if (error instanceof Error) {
+      return res.status(400).json({ error: error.message });
+    }
+    return res
+      .status(500)
+      .json({ error: "Error desconocido al obtener los promedios semanales." });
   }
 };
 

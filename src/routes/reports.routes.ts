@@ -4,6 +4,7 @@ import {
   hourlyReportHandler,
   monthlyReportHandler,
   recalculateHourlyHandler,
+  weeklyAveragesHandler,
 } from "../controllers/reports.controller";
 import { authorize, protect } from "../middlewares/auth.middleware";
 
@@ -19,6 +20,7 @@ if (!REPORTS_AUTH_DISABLED) {
 router.get("/hourly", hourlyReportHandler);
 router.get("/daily", dailyReportHandler);
 router.get("/monthly", monthlyReportHandler);
+router.get("/weekly", weeklyAveragesHandler);
 
 if (REPORTS_AUTH_DISABLED) {
   router.post("/hourly/recalculate", recalculateHourlyHandler);

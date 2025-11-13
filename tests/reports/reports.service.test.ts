@@ -3,6 +3,7 @@ import {
   getDailyReport,
   getHourlyReport,
   getMonthlyReport,
+  getWeeklySensorAverages,
   upsertHourlyAverages,
 } from "../../src/services/reports.service";
 import SensorDataModel from "../../src/models/sensor-data.model";
@@ -374,6 +375,111 @@ describe("reports.service", () => {
         RadPro: 600,
         RadMax: 600,
       });
+    });
+  });
+
+  describe("getWeeklySensorAverages", () => {
+    it("calcula promedios ponderados por sensor", async () => {
+      const reference = DateTime.fromISO("2025-11-09T00:00:00", {
+        zone: UTC_ZONE,
+      });
+
+      const docs = [
+        {
+          deviceId: "ESP32_1",
+          sensorType: "temperature",
+          hour: reference.minus({ days: 1 }).toJSDate(),
+          avg: 20,
+          min: 18,
+          max: 22,
+          samples: 2,
+          units: "°C",
+        },
+        {
+          deviceId: "ESP32_1",
+          sensorType: "temperature",
+          hour: reference.minus({ days: 2 }).toJSDate(),
+          avg: 30,
+          min: 29,
+          max: 31,
+          samples: 1,
+          units: "°C",
+        },
+        {
+          deviceId: "ESP32_1",
+          sensorType: "humidity",
+          hour: reference.minus({ days: 3 }).toJSDate(),
+          avg: 60,
+          min: 58,
+          max: 62,
+          samples: 3,
+          units: "%",
+        },
+      ];
+
+      const { chain } = buildQueryChain(docs);
+      findMock.mockReturnValueOnce(chain);
+
+      const payload = await getWeeklySensorAverages("ESP32_1", {
+        days: 7,
+        referenceDate: reference.toJSDate(),
+      });
+
+      expect(findMock).toHaveBeenCalledTimes(1);
+      const queryArg = findMock.mock.calls[0][0];
+      expect(queryArg).toMatchObject({
+        deviceId: "ESP32_1",
+      });
+      expect(queryArg.hour.$lte.toISOString()).toBe(
+        reference.toJSDate().toISOString()
+      );
+      expect(queryArg.hour.$gte.toISOString()).toBe(
+        reference.minus({ days: 7 }).toJSDate().toISOString()
+      );
+
+      expect(payload.deviceId).toBe("ESP32_1");
+      expect(payload.days).toBe(7);
+      expect(payload.sensors).toEqual([
+        {
+          sensorType: "temperature",
+          average: 23.33,
+          samples: 3,
+          units: "°C",
+        },
+        {
+          sensorType: "humidity",
+          average: 60,
+          samples: 3,
+          units: "%",
+        },
+      ]);
+      expect(payload.range.from).toBe("2025-11-02T00:00:00Z");
+      expect(payload.range.to).toBe("2025-11-09T00:00:00Z");
+      expect(payload.daily).toHaveLength(7);
+
+      const saturday = payload.daily.find(
+        (day) => day.date === "2025-11-08T00:00:00Z"
+      );
+      expect(saturday).toMatchObject({
+        weekday: 6,
+        weekdayName: "Sábado",
+        sensors: [
+          {
+            sensorType: "temperature",
+            average: 20,
+            samples: 2,
+            units: "°C",
+          },
+        ],
+      });
+
+      const monday = payload.daily[0];
+      expect(monday).toMatchObject({
+        date: "2025-11-03T00:00:00Z",
+        weekday: 1,
+        weekdayName: "Lunes",
+      });
+      expect(monday.sensors).toEqual([]);
     });
   });
 });

@@ -118,6 +118,7 @@ El sistema recibe lecturas de sensores (temperatura, humedad, humedad de suelo y
   - `getHourlyReport`: filtros por dispositivo, sensor y rango (`from/to` o `date`), paginación y resultados en ISO UTC.
   - `getDailyReport`: 24 filas con promedios horarios, + métricas `tmax/tmin/tpro`, `hpro`, `radTot/radPro/radMax`.
   - `getMonthlyReport`: agrega por día (temperatura, humedad, radiación).
+  - `getWeeklySensorAverages`: resume los promedios ponderados por sensor de los últimos N días (7 por defecto) y se expone en `GET /api/reports/weekly`. Desde ahora también entrega `daily[]` con una fila por día (`weekday`, `weekdayName`, `date` y los sensores promediados) para que el frontend pueda renderizar etiquetas como “Lunes”, “Martes”, etc., incluso si no hubo lecturas en todos los días solicitados.
   - `upsertHourlyAverages`: recalcula un rango arbitrario; expuesto vía `POST /api/reports/hourly/recalculate`.
 
 ## Modelos y persistencia
