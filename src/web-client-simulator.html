@@ -50,6 +50,33 @@
                   </div>
                   <form class="row g-3 align-items-end" id="settingsForm">
                     <div class="col-12">
+                      <div
+                        class="d-flex justify-content-between align-items-center"
+                      >
+                        <label class="form-label mb-0" for="environmentToggle"
+                          >Entorno</label
+                        >
+                        <div class="form-check form-switch m-0">
+                          <input
+                            class="form-check-input"
+                            id="environmentToggle"
+                            role="switch"
+                            type="checkbox"
+                          />
+                          <label
+                            class="form-check-label"
+                            for="environmentToggle"
+                          >
+                            <span id="environmentLabel">Desarrollo</span>
+                          </label>
+                        </div>
+                      </div>
+                      <small class="text-muted"
+                        >Desarrollo usa localhost:3000 y producción el servidor
+                        EC2.</small
+                      >
+                    </div>
+                    <div class="col-12">
                       <label class="form-label" for="apiBaseInput"
                         >API Base URL</label
                       >
@@ -643,6 +670,8 @@
       const minThresholdHelp = document.getElementById("minThresholdHelp");
       const maxThresholdHelp = document.getElementById("maxThresholdHelp");
       const settingsForm = document.getElementById("settingsForm");
+      const environmentToggle = document.getElementById("environmentToggle");
+      const environmentLabel = document.getElementById("environmentLabel");
       const apiBaseInput = document.getElementById("apiBaseInput");
       const wsUrlInput = document.getElementById("wsUrlInput");
       const authTokenInput = document.getElementById("authTokenInput");
@@ -740,6 +769,19 @@
         },
       };
 
+      const ENVIRONMENTS = {
+        development: {
+          label: "Desarrollo",
+          apiBase: "http://localhost:3000/api",
+          wsUrl: "ws://localhost:3000",
+        },
+        production: {
+          label: "Producción",
+          apiBase: "http://ec2-98-86-100-220.compute-1.amazonaws.com:3000/api",
+          wsUrl: "ws://ec2-98-86-100-220.compute-1.amazonaws.com:3000",
+        },
+      };
+
       const DEFAULT_FIREBASE_CONFIG = {
         apiKey: "AIzaSyBRftDkf-IAl4RB_8xhFKUJsLxuO9ysiyc",
         authDomain: "monitoring-system-f50e6.firebaseapp.com",
@@ -757,14 +799,21 @@
         token: "simulator.authToken",
         firebaseConfig: "simulator.firebaseConfig",
         firebaseVapid: "simulator.firebaseVapidKey",
+        environment: "simulator.environment",
       };
+
+      let currentEnvironment =
+        window.localStorage.getItem(STORAGE_KEYS.environment) || "development";
+      if (!ENVIRONMENTS[currentEnvironment]) {
+        currentEnvironment = "development";
+      }
 
       let apiBaseUrl =
         window.localStorage.getItem(STORAGE_KEYS.apiBase) ||
-        "http://localhost:3000/api";
+        ENVIRONMENTS[currentEnvironment].apiBase;
       let wsUrl =
         window.localStorage.getItem(STORAGE_KEYS.wsUrl) ||
-        "ws://localhost:3000";
+        ENVIRONMENTS[currentEnvironment].wsUrl;
       let authToken = window.localStorage.getItem(STORAGE_KEYS.token) || "";
       let firebaseClientConfig = loadStoredFirebaseConfig();
       let firebaseVapidKey =
@@ -775,8 +824,14 @@
         firebaseClientConfig = { ...DEFAULT_FIREBASE_CONFIG };
       }
 
-      if (apiBaseInput) apiBaseInput.value = apiBaseUrl;
-      if (wsUrlInput) wsUrlInput.value = wsUrl;
+      updateEnvironmentDisplay();
+
+      if (apiBaseInput) {
+        apiBaseInput.value = apiBaseUrl;
+      }
+      if (wsUrlInput) {
+        wsUrlInput.value = wsUrl;
+      }
       if (authTokenInput) authTokenInput.value = authToken;
 
       const knownDevices = new Set(["ESP32_1", "ESP32_2"]);
@@ -820,6 +875,24 @@
       updateThresholdHints();
       updateSensorSimulationHints();
       connectWebSocket();
+
+      if (environmentToggle) {
+        environmentToggle.addEventListener("change", () => {
+          const nextEnvironment = environmentToggle.checked
+            ? "production"
+            : "development";
+          if (nextEnvironment === currentEnvironment) {
+            return;
+          }
+          currentEnvironment = nextEnvironment;
+          window.localStorage.setItem(
+            STORAGE_KEYS.environment,
+            currentEnvironment,
+          );
+          updateEnvironmentDisplay();
+          applyEnvironmentSelection();
+        });
+      }
 
       if (settingsForm) {
         settingsForm.addEventListener("submit", (event) => {
@@ -1044,6 +1117,44 @@
           "change",
           updateSensorSimulationHints,
         );
+      }
+
+      function getEnvironmentConfig() {
+        return ENVIRONMENTS[currentEnvironment] || ENVIRONMENTS.development;
+      }
+
+      function updateEnvironmentDisplay() {
+        const config = getEnvironmentConfig();
+        if (environmentLabel) {
+          environmentLabel.textContent = config.label;
+        }
+        if (environmentToggle) {
+          environmentToggle.checked = currentEnvironment === "production";
+        }
+        if (apiBaseInput) {
+          apiBaseInput.placeholder = config.apiBase;
+        }
+        if (wsUrlInput) {
+          wsUrlInput.placeholder = config.wsUrl;
+        }
+      }
+
+      function applyEnvironmentSelection() {
+        const config = getEnvironmentConfig();
+        apiBaseUrl = config.apiBase;
+        wsUrl = config.wsUrl;
+        if (apiBaseInput) {
+          apiBaseInput.value = apiBaseUrl;
+        }
+        if (wsUrlInput) {
+          wsUrlInput.value = wsUrl;
+        }
+        window.localStorage.setItem(STORAGE_KEYS.apiBase, apiBaseUrl);
+        window.localStorage.setItem(STORAGE_KEYS.wsUrl, wsUrl);
+        logMessage(
+          `Entorno cambiado a ${config.label}. Configuración actualizada.`,
+        );
+        connectWebSocket();
       }
 
       function refreshDeviceSuggestions() {
