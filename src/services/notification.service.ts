@@ -1,11 +1,7 @@
-import { WebSocketServer, WebSocket } from "ws";
+import { WebSocket, WebSocketServer } from "ws";
 import { SensorPayload } from "../interfaces/sensor-payload";
 import type { SensorThreshold } from "../interfaces/plant.interface";
-import {
-  ThresholdType,
-  sendSensorAlertNotification,
-  SensorAlertNotification,
-} from "./push-notification.service";
+import { sendSensorAlertNotification, SensorAlertNotification, ThresholdType } from "./push-notification.service";
 import { getActiveFcmTokens } from "./fcm-token.service";
 
 /**
@@ -28,8 +24,10 @@ interface SensorThresholdConfig {
   plantName?: string | null;
 }
 
-const alertThresholds: Record<string, Record<string, SensorThresholdConfig>> =
-  {};
+const alertThresholds: Record<
+  string,
+  Record<string, SensorThresholdConfig>
+> = {};
 
 export const ALERT_ENABLED_DEVICE_IDS = new Set<string>(["ESP32_1"]);
 
@@ -45,7 +43,7 @@ export function setAlertThreshold(
   deviceId: string,
   sensorType: string,
   thresholds: SensorThreshold,
-  association: ThresholdAssociationMetadata = {}
+  association: ThresholdAssociationMetadata = {},
 ): SensorThreshold | undefined {
   const sanitized: SensorThreshold = {};
   const normalizedDeviceId = deviceId.trim();
@@ -60,7 +58,7 @@ export function setAlertThreshold(
 
   if (!normalizedSensorType) {
     throw new Error(
-      "El tipo de sensor es obligatorio para configurar umbrales."
+      "El tipo de sensor es obligatorio para configurar umbrales.",
     );
   }
 
@@ -104,7 +102,7 @@ export function setAlertThreshold(
   if (sanitized.min !== undefined && sanitized.max !== undefined) {
     if (sanitized.min > sanitized.max) {
       throw new Error(
-        `El mínimo (${sanitized.min}) no puede ser mayor que el máximo (${sanitized.max}) para ${sensorType}`
+        `El mínimo (${sanitized.min}) no puede ser mayor que el máximo (${sanitized.max}) para ${sensorType}`,
       );
     }
   }
@@ -126,7 +124,7 @@ export function setAlertThreshold(
  */
 export function getAlertThreshold(
   deviceId: string,
-  sensorType: string
+  sensorType: string,
 ): SensorThresholdConfig | undefined {
   return alertThresholds[deviceId]?.[sensorType];
 }
@@ -138,7 +136,7 @@ export function getAlertThreshold(
  */
 export const checkSensorDataForAlerts = async (
   wss: WebSocketServer,
-  sensorData: SensorPayload
+  sensorData: SensorPayload,
 ): Promise<void> => {
   const { deviceId, sensorType, value, unit } = sensorData;
 
@@ -156,13 +154,13 @@ export const checkSensorDataForAlerts = async (
 
   if (thresholds.max !== undefined && value > thresholds.max) {
     alertMessage = `¡Alerta en ${deviceId}! ${getSensorName(sensorType)} ha superado el máximo: ${value.toFixed(
-      2
+      2,
     )} ${unit} (Máx: ${thresholds.max} ${unit}).`;
     triggeredThresholdType = "max";
     triggeredThresholdValue = thresholds.max;
   } else if (thresholds.min !== undefined && value < thresholds.min) {
     alertMessage = `¡Alerta en ${deviceId}! ${getSensorName(sensorType)} está por debajo del mínimo: ${value.toFixed(
-      2
+      2,
     )} ${unit} (Mín: ${thresholds.min} ${unit}).`;
     triggeredThresholdType = "min";
     triggeredThresholdValue = thresholds.min;
@@ -193,13 +191,9 @@ export const checkSensorDataForAlerts = async (
   const timestamp = new Date().toISOString();
 
   const plantId =
-    thresholdConfig?.plantId !== undefined
-      ? thresholdConfig.plantId
-      : null;
+    thresholdConfig?.plantId !== undefined ? thresholdConfig.plantId : null;
   const plantName =
-    thresholdConfig?.plantName !== undefined
-      ? thresholdConfig.plantName
-      : null;
+    thresholdConfig?.plantName !== undefined ? thresholdConfig.plantName : null;
   const sensorThresholds = { ...thresholds };
 
   const alertPayload = {
@@ -231,7 +225,7 @@ export const checkSensorDataForAlerts = async (
   } catch (error) {
     console.error(
       "No se pudieron cargar los tokens FCM antes de enviar la alerta:",
-      error
+      error,
     );
   }
 
@@ -256,7 +250,7 @@ export const checkSensorDataForAlerts = async (
   void sendSensorAlertNotification(notificationPayload).catch((error) => {
     console.error(
       "No se pudo enviar la alerta vía Firebase Cloud Messaging:",
-      error
+      error,
     );
   });
 };
