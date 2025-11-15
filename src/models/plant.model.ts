@@ -91,6 +91,16 @@ function validateThresholds(value: PlantThresholds | undefined) {
         `El umbral mínimo no puede ser mayor al máximo para el sensor ${sensor}.`
       );
     }
+
+    if (
+      sensor === "solar_radiation" &&
+      hasMin &&
+      (thresholds.min as number) <= 0
+    ) {
+      throw new Error(
+        "El umbral mínimo para radiación solar debe ser mayor a 0."
+      );
+    }
   }
 }
 

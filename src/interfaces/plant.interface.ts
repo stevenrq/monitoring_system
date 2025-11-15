@@ -21,6 +21,7 @@ export type PlantThresholdsUpdate = Partial<
 export interface PlantUpdatePayload {
   name?: string;
   thresholds?: PlantThresholdsUpdate;
+  deviceId?: string;
 }
 
 export interface IPlantDocument extends IPlant, Document {}

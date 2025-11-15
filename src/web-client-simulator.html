@@ -304,7 +304,7 @@
                 <h5>Gestión de plantas y umbrales</h5>
                 <p class="text-muted mb-0">
                   Aplica los umbrales a cada sensor y mantenlos sincronizados
-                  con el motor de alertas.
+                  con el motor de alertas. Solo <strong>ESP32_1</strong> envía notificaciones en tiempo real; <strong>ESP32_2</strong> se reserva para reportes históricos.
                 </p>
               </div>
             </div>
@@ -352,8 +352,17 @@
                 </div>
               </div>
               <div class="col-md-3">
-                <button class="btn btn-success w-100" type="submit">
+                <button class="btn btn-success w-100" id="plantSubmitBtn" type="submit">
                   <i class="bi bi-plant"></i> Crear planta
+                </button>
+              </div>
+              <div class="col-md-3 d-none" id="plantCancelEditCol">
+                <button
+                  class="btn btn-outline-danger w-100"
+                  id="plantCancelEditBtn"
+                  type="button"
+                >
+                  <i class="bi bi-x-circle"></i> Cancelar edición
                 </button>
               </div>
               <div class="col-md-3">
@@ -377,11 +386,12 @@
                     <th>Dispositivo</th>
                     <th>Umbrales configurados</th>
                     <th>Actualización</th>
+                    <th class="text-center" style="width: 200px;">Acciones</th>
                   </tr>
                 </thead>
                 <tbody id="plantsTableBody">
                   <tr>
-                    <td class="text-center text-muted" colspan="4">
+                    <td class="text-center text-muted" colspan="5">
                       Aún no hay plantas cargadas.
                     </td>
                   </tr>
@@ -441,7 +451,7 @@
                 </button>
               </div>
               <div class="col-12">
-                <div class="text-muted small" id="fcmStatus"></div>
+                <div class="text-muted small" id="fcmStatus">Solo los dispositivos registrados como ESP32_1 recibirán estas alertas push.</div>
               </div>
             </form>
           </section>
@@ -553,7 +563,8 @@
               <p class="text-muted small mb-3">
                 Envía lecturas por WebSocket para disparar los umbrales
                 definidos por tus plantas con el fin de probar las
-                notificaciones.
+                notificaciones. Recuerda que solo <strong>ESP32_1</strong>
+                generará alertas en tiempo real.
               </p>
               <form class="row g-3 align-items-end" id="sensorForm">
                 <div class="col-lg-4">
@@ -718,6 +729,9 @@
       );
       const plantsTableBody = document.getElementById("plantsTableBody");
       const plantStatus = document.getElementById("plantStatus");
+      const plantSubmitBtn = document.getElementById("plantSubmitBtn");
+      const plantCancelEditBtn = document.getElementById("plantCancelEditBtn");
+      const plantCancelEditCol = document.getElementById("plantCancelEditCol");
       const refreshPlantsBtn = document.getElementById("refreshPlantsBtn");
       const fcmForm = document.getElementById("fcmForm");
       const fcmTokenInput = document.getElementById("fcmTokenInput");
@@ -733,8 +747,6 @@
       const sensorUnitInput = document.getElementById("sensorUnitInput");
       const sensorStatus = document.getElementById("sensorStatus");
       const alertsList = document.getElementById("alertsList");
-
-      const subscribedDevices = new Set();
 
       const SENSOR_METADATA = {
         temperature: {
@@ -801,6 +813,42 @@
         firebaseVapid: "simulator.firebaseVapidKey",
         environment: "simulator.environment",
       };
+      const SESSION_KEYS = {
+        plantDraft: "simulator.session.plantDraft",
+        thresholdDraft: "simulator.session.thresholdDraft",
+        sensorDraft: "simulator.session.sensorDraft",
+        fcmDraft: "simulator.session.fcmDraft",
+        knownDevices: "simulator.session.knownDevices",
+        subscriptions: "simulator.session.subscriptions",
+      };
+
+      function saveSessionState(key, value) {
+        try {
+          window.sessionStorage.setItem(key, JSON.stringify(value));
+        } catch (error) {
+          console.warn("No se pudo guardar el estado de sesión:", error);
+        }
+      }
+
+      function loadSessionState(key, fallback = null) {
+        try {
+          const raw = window.sessionStorage.getItem(key);
+          if (!raw) return fallback;
+          const parsed = JSON.parse(raw);
+          return parsed ?? fallback;
+        } catch (error) {
+          console.warn("No se pudo restaurar el estado de sesión:", error);
+          return fallback;
+        }
+      }
+
+      function clearSessionState(key) {
+        try {
+          window.sessionStorage.removeItem(key);
+        } catch (error) {
+          console.warn("No se pudo limpiar el estado de sesión:", error);
+        }
+      }
 
       let currentEnvironment =
         window.localStorage.getItem(STORAGE_KEYS.environment) || "development";
@@ -834,7 +882,30 @@
       }
       if (authTokenInput) authTokenInput.value = authToken;
 
+      const storedKnownDevices = loadSessionState(SESSION_KEYS.knownDevices, []);
       const knownDevices = new Set(["ESP32_1", "ESP32_2"]);
+      if (Array.isArray(storedKnownDevices)) {
+        for (const deviceId of storedKnownDevices) {
+          if (typeof deviceId === "string" && deviceId.trim()) {
+            knownDevices.add(deviceId.trim());
+          }
+        }
+      }
+
+      const storedSubscriptions = loadSessionState(
+        SESSION_KEYS.subscriptions,
+        [],
+      );
+      const subscribedDevices = new Set(
+        Array.isArray(storedSubscriptions)
+          ? storedSubscriptions.filter(
+              (deviceId) => typeof deviceId === "string" && deviceId.trim(),
+            )
+          : [],
+      );
+
+      let cachedPlants = [];
+      let editingPlantId = null;
       const pendingWsMessages = [];
       let firebaseMessagingInstance = null;
       let firebaseServiceWorkerRegistration = null;
@@ -871,9 +942,14 @@
         sensorTypeSelect.addEventListener("change", updateThresholdHints);
       }
 
-      renderPlantThresholdRows();
+      resetPlantForm({ keepDraft: true });
       updateThresholdHints();
+      restoreThresholdFormState();
+      restorePlantFormDraft();
       updateSensorSimulationHints();
+      restoreSensorFormState();
+      restoreFcmFormState();
+      restoreSubscribedDeviceCards();
       connectWebSocket();
 
       if (environmentToggle) {
@@ -977,6 +1053,7 @@
             const token = await handleGetBrowserFcmToken();
             if (fcmTokenInput && token) {
               fcmTokenInput.value = token;
+              persistFcmFormState();
             }
             if (firebaseStatus) {
               firebaseStatus.textContent = "Token web generado correctamente.";
@@ -1022,6 +1099,7 @@
           registerKnownDevice(deviceId);
           createDeviceCard(deviceId);
           subscribedDevices.add(deviceId);
+          persistSubscribedDevices();
           deviceIdInput.value = "";
         });
 
@@ -1094,22 +1172,70 @@
             )}...`,
           );
         });
+        thresholdForm.addEventListener("input", persistThresholdFormState);
+        thresholdForm.addEventListener("change", persistThresholdFormState);
       }
 
       if (plantForm) {
         plantForm.addEventListener("submit", handlePlantFormSubmit);
+        plantForm.addEventListener("input", persistPlantFormDraft);
+        plantForm.addEventListener("change", persistPlantFormDraft);
+      }
+
+      if (plantCancelEditBtn) {
+        plantCancelEditBtn.addEventListener("click", () => {
+          resetPlantForm();
+          if (plantStatus) {
+            plantStatus.textContent = "Edición cancelada.";
+            plantStatus.className = "text-muted small";
+          }
+        });
       }
 
       if (refreshPlantsBtn) {
         refreshPlantsBtn.addEventListener("click", loadPlants);
       }
 
+      if (plantsTableBody) {
+        plantsTableBody.addEventListener("click", (event) => {
+          if (!(event.target instanceof Element)) return;
+          const actionBtn = event.target.closest("[data-plant-action]");
+          if (!actionBtn) return;
+          const action = actionBtn.getAttribute("data-plant-action");
+          const plantId = actionBtn.getAttribute("data-plant-id");
+          if (!plantId) return;
+
+          if (action === "edit") {
+            const plant = findPlantById(plantId);
+            if (!plant) {
+              alert("No se pudo cargar la planta seleccionada.");
+              return;
+            }
+            startPlantEdit(plant);
+          } else if (action === "delete") {
+            const plant = findPlantById(plantId);
+            const plantName = plant?.name || "la planta";
+            if (
+              confirm(
+                `¿Eliminar "${plantName}"? Esto actualizará los umbrales del dispositivo asociado.`,
+              )
+            ) {
+              deletePlantById(plantId);
+            }
+          }
+        });
+      }
+
       if (fcmForm) {
         fcmForm.addEventListener("submit", handleFcmSubmit);
+        fcmForm.addEventListener("input", persistFcmFormState);
+        fcmForm.addEventListener("change", persistFcmFormState);
       }
 
       if (sensorForm) {
         sensorForm.addEventListener("submit", handleSensorFormSubmit);
+        sensorForm.addEventListener("input", persistSensorFormState);
+        sensorForm.addEventListener("change", persistSensorFormState);
       }
 
       if (sensorTypeSimulation) {
@@ -1117,6 +1243,7 @@
           "change",
           updateSensorSimulationHints,
         );
+        sensorTypeSimulation.addEventListener("change", persistSensorFormState);
       }
 
       function getEnvironmentConfig() {
@@ -1170,6 +1297,7 @@
         if (!sanitized) return;
         if (!knownDevices.has(sanitized)) {
           knownDevices.add(sanitized);
+          persistKnownDevices();
           refreshDeviceSuggestions();
         }
         if (thresholdDeviceInput && !thresholdDeviceInput.value) {
@@ -1180,6 +1308,25 @@
         }
         if (sensorDeviceInput && !sensorDeviceInput.value) {
           sensorDeviceInput.value = sanitized;
+        }
+        persistPlantFormDraft();
+        persistThresholdFormState();
+        persistSensorFormState();
+      }
+
+      function persistKnownDevices() {
+        saveSessionState(SESSION_KEYS.knownDevices, Array.from(knownDevices));
+      }
+
+      function persistSubscribedDevices() {
+        saveSessionState(SESSION_KEYS.subscriptions, Array.from(subscribedDevices));
+      }
+
+      function restoreSubscribedDeviceCards() {
+        if (!subscribedDevices.size) return;
+        for (const deviceId of subscribedDevices) {
+          registerKnownDevice(deviceId);
+          createDeviceCard(deviceId);
         }
       }
 
@@ -1198,6 +1345,16 @@
           logMessage(`Conectado al servidor WebSocket (${wsUrl}).`);
           if (pendingWsMessages.length) {
             pendingWsMessages.splice(0).forEach((msg) => socket.send(msg));
+          }
+          for (const deviceId of subscribedDevices) {
+            try {
+              socket.send(
+                JSON.stringify({ event: "subscribeToDevice", deviceId }),
+              );
+              logMessage(`Suscripción restaurada a ${deviceId}.`);
+            } catch (error) {
+              console.warn("No se pudo restaurar la suscripción:", error);
+            }
           }
         };
 
@@ -1611,10 +1768,15 @@
           (plantDeviceInput.value && plantDeviceInput.value.trim()) ||
           "ESP32_1";
 
+        const isEditing = Boolean(editingPlantId);
+        const url = isEditing
+          ? `${apiBaseUrl}/plants/${editingPlantId}`
+          : `${apiBaseUrl}/plants`;
+
         try {
           const thresholdsPayload = buildPlantThresholdsPayload();
-          const response = await fetch(`${apiBaseUrl}/plants`, {
-            method: "POST",
+          const response = await fetch(url, {
+            method: isEditing ? "PUT" : "POST",
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${authToken}`,
@@ -1628,12 +1790,22 @@
 
           const data = await response.json();
           if (!response.ok) {
-            throw new Error(data?.error || "No se pudo crear la planta.");
+            throw new Error(
+              data?.error ||
+                (isEditing
+                  ? "No se pudo actualizar la planta."
+                  : "No se pudo crear la planta."),
+            );
           }
 
-          plantStatus.textContent = `Planta "${data.name}" creada correctamente.`;
+          const updatedPlant = data?.plant || data;
+          plantStatus.textContent = isEditing
+            ? data?.message ||
+              `Planta "${updatedPlant?.name || name}" actualizada correctamente.`
+            : `Planta "${updatedPlant?.name || name}" creada correctamente.`;
           plantStatus.className = "text-success small";
           registerKnownDevice(deviceId);
+          resetPlantForm();
           await loadPlants();
         } catch (error) {
           console.error(error);
@@ -1699,6 +1871,110 @@
         return payload;
       }
 
+      function collectCurrentPlantThresholdValues() {
+        const rows = plantThresholdsBody?.querySelectorAll("[data-sensor-row]");
+        const current = {};
+        if (!rows) {
+          return current;
+        }
+
+        rows.forEach((row) => {
+          const sensor = row.getAttribute("data-sensor");
+          if (!sensor) return;
+          const minInput = row.querySelector('[data-threshold="min"]');
+          const maxInput = row.querySelector('[data-threshold="max"]');
+          const values = {};
+
+          if (
+            minInput &&
+            !minInput.disabled &&
+            !minInput.hasAttribute("readonly")
+          ) {
+            const trimmed = minInput.value.trim();
+            if (trimmed) values.min = trimmed;
+          } else if (
+            minInput &&
+            minInput.hasAttribute("readonly") &&
+            minInput.value.trim()
+          ) {
+            values.min = minInput.value.trim();
+          }
+
+          if (maxInput && !maxInput.disabled) {
+            const trimmed = maxInput.value.trim();
+            if (trimmed) values.max = trimmed;
+          }
+
+          current[sensor] = values;
+        });
+        return current;
+      }
+
+      function persistPlantFormDraft() {
+        const draft = {
+          name: plantNameInput?.value || "",
+          deviceId: plantDeviceInput?.value || "",
+          thresholds: collectCurrentPlantThresholdValues(),
+          editingPlantId,
+        };
+        saveSessionState(SESSION_KEYS.plantDraft, draft);
+      }
+
+      function restorePlantFormDraft() {
+        const draft = loadSessionState(SESSION_KEYS.plantDraft);
+        if (!draft) return;
+        if (plantNameInput && typeof draft.name === "string") {
+          plantNameInput.value = draft.name;
+        }
+        if (plantDeviceInput && typeof draft.deviceId === "string") {
+          plantDeviceInput.value = draft.deviceId;
+        }
+        if (draft.thresholds) {
+          applyPlantThresholdValues(draft.thresholds);
+        }
+        if (draft.editingPlantId) {
+          editingPlantId = draft.editingPlantId;
+          if (plantSubmitBtn) {
+            plantSubmitBtn.innerHTML =
+              '<i class="bi bi-pencil-square"></i> Actualizar planta';
+            plantSubmitBtn.classList.remove("btn-success");
+            plantSubmitBtn.classList.add("btn-warning");
+          }
+          if (plantCancelEditCol) {
+            plantCancelEditCol.classList.remove("d-none");
+          }
+          if (plantStatus) {
+            plantStatus.textContent =
+              "Continuas una edición pendiente. Ajusta y guarda los cambios.";
+            plantStatus.className = "text-warning small";
+          }
+        }
+      }
+
+      function resetPlantForm(options = {}) {
+        const { keepDraft = false } = options;
+        editingPlantId = null;
+        if (plantForm) {
+          plantForm.reset();
+        }
+        renderPlantThresholdRows();
+        if (!keepDraft) {
+          clearSessionState(SESSION_KEYS.plantDraft);
+        }
+        if (plantSubmitBtn) {
+          plantSubmitBtn.innerHTML = `<i class="bi bi-plant"></i> Crear planta`;
+          plantSubmitBtn.classList.add("btn-success");
+          plantSubmitBtn.classList.remove("btn-warning");
+        }
+        if (plantCancelEditCol) {
+          plantCancelEditCol.classList.add("d-none");
+        }
+        if (plantDeviceInput) {
+          const sanitized = plantDeviceInput.value?.trim();
+          plantDeviceInput.value = sanitized || "ESP32_1";
+        }
+      }
+
       function renderPlantThresholdRows() {
         if (!plantThresholdsBody) return;
         const rows = Object.entries(SENSOR_METADATA)
@@ -1733,6 +2009,35 @@
         plantThresholdsBody.innerHTML = rows;
       }
 
+      function applyPlantThresholdValues(thresholds) {
+        if (!plantThresholdsBody) return;
+        const rows = plantThresholdsBody.querySelectorAll("[data-sensor-row]");
+        rows.forEach((row) => {
+          const sensor = row.getAttribute("data-sensor");
+          if (!sensor) return;
+          const values =
+            thresholds && typeof thresholds === "object"
+              ? thresholds[sensor] || {}
+              : {};
+          const minInput = row.querySelector('[data-threshold="min"]');
+          const maxInput = row.querySelector('[data-threshold="max"]');
+          if (minInput) {
+            if (values.min !== undefined && values.min !== null) {
+              minInput.value = String(values.min);
+            } else if (!minInput.hasAttribute("readonly") && !minInput.disabled) {
+              minInput.value = "";
+            }
+          }
+          if (maxInput) {
+            if (values.max !== undefined && values.max !== null) {
+              maxInput.value = String(values.max);
+            } else if (!maxInput.disabled) {
+              maxInput.value = "";
+            }
+          }
+        });
+      }
+
       async function loadPlants() {
         if (!requireAuthToken()) return;
         if (!plantsTableBody) return;
@@ -1754,7 +2059,8 @@
           }
 
           renderPlantsTable(data);
-          plantStatus.textContent = `Se encontraron ${data.length} planta(s).`;
+          const plantCount = Array.isArray(data) ? data.length : 0;
+          plantStatus.textContent = `Se encontraron ${plantCount} planta(s).`;
           plantStatus.className = "text-success small";
         } catch (error) {
           console.error(error);
@@ -1766,16 +2072,20 @@
 
       function renderPlantsTable(plants) {
         if (!plantsTableBody) return;
-        if (!Array.isArray(plants) || !plants.length) {
+        cachedPlants = Array.isArray(plants) ? plants : [];
+
+        if (!cachedPlants.length) {
           plantsTableBody.innerHTML = `
             <tr>
-              <td colspan="4" class="text-center text-muted">No hay plantas registradas.</td>
+              <td colspan="5" class="text-center text-muted">No hay plantas registradas.</td>
             </tr>`;
           return;
         }
 
-        plantsTableBody.innerHTML = plants
+        plantsTableBody.innerHTML = cachedPlants
           .map((plant) => {
+            const deviceId = plant.deviceId || "ESP32_1";
+            registerKnownDevice(deviceId);
             const thresholdsSummary = Object.keys(SENSOR_METADATA)
               .map((sensor) => {
                 const meta = SENSOR_METADATA[sensor];
@@ -1791,15 +2101,119 @@
                 return `<div><strong>${meta.name}:</strong> ${minLabel} / ${maxLabel}</div>`;
               })
               .join("");
+            const plantId = getPlantIdentifier(plant);
+            const actionsHtml = plantId
+              ? `<div class="btn-group btn-group-sm flex-wrap justify-content-center" role="group">
+                  <button type="button" class="btn btn-outline-primary" data-plant-action="edit" data-plant-id="${plantId}" title="Editar planta">
+                    <i class="bi bi-pencil-square me-1"></i>Editar
+                  </button>
+                  <button type="button" class="btn btn-outline-danger" data-plant-action="delete" data-plant-id="${plantId}" title="Eliminar planta">
+                    <i class="bi bi-trash me-1"></i>Eliminar
+                  </button>
+                </div>`
+              : `<span class="text-muted">N/D</span>`;
 
             return `<tr>
               <td>${plant.name}</td>
-              <td>${plant.deviceId || "ESP32_1"}</td>
+              <td>${deviceId}</td>
               <td>${thresholdsSummary}</td>
               <td>${plant.updatedAt ? new Date(plant.updatedAt).toLocaleString() : "—"}</td>
+              <td class="text-center">${actionsHtml}</td>
             </tr>`;
           })
           .join("");
+      }
+
+      function getPlantIdentifier(plant) {
+        if (!plant || typeof plant !== "object") return undefined;
+        return (
+          plant._id ||
+          plant.id ||
+          plant.plantId ||
+          plant.uuid ||
+          plant.identifier ||
+          undefined
+        );
+      }
+
+      function findPlantById(plantId) {
+        if (!plantId) return undefined;
+        return cachedPlants.find(
+          (plant) => getPlantIdentifier(plant) === plantId,
+        );
+      }
+
+      async function deletePlantById(plantId) {
+        if (!requireAuthToken()) return;
+        try {
+          const response = await fetch(`${apiBaseUrl}/plants/${plantId}`, {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+            },
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(
+              data?.error || "No se pudo eliminar la planta seleccionada.",
+            );
+          }
+
+          if (plantStatus) {
+            plantStatus.textContent =
+              data?.message || "Planta eliminada correctamente.";
+            plantStatus.className = "text-success small";
+          }
+
+          if (editingPlantId === plantId) {
+            resetPlantForm();
+          }
+
+          await loadPlants();
+        } catch (error) {
+          console.error(error);
+          if (plantStatus) {
+            plantStatus.textContent =
+              error instanceof Error ? error.message : "Error desconocido.";
+            plantStatus.className = "text-danger small";
+          }
+        }
+      }
+
+      function startPlantEdit(plant) {
+        if (!plant) return;
+        const plantId = getPlantIdentifier(plant);
+        if (!plantId) {
+          console.warn("No se pudo determinar el ID de la planta seleccionada.");
+          return;
+        }
+        editingPlantId = plantId;
+        renderPlantThresholdRows();
+        applyPlantThresholdValues(plant.thresholds || {});
+        if (plantNameInput) {
+          plantNameInput.value = plant.name || "";
+        }
+        if (plantDeviceInput) {
+          plantDeviceInput.value = plant.deviceId || "ESP32_1";
+        }
+        if (plantSubmitBtn) {
+          plantSubmitBtn.innerHTML =
+            '<i class="bi bi-pencil-square"></i> Actualizar planta';
+          plantSubmitBtn.classList.remove("btn-success");
+          plantSubmitBtn.classList.add("btn-warning");
+        }
+        if (plantCancelEditCol) {
+          plantCancelEditCol.classList.remove("d-none");
+        }
+        if (plantStatus) {
+          plantStatus.textContent = `Editando "${plant.name}". Ajusta los umbrales y guarda los cambios.`;
+          plantStatus.className = "text-warning small";
+        }
+        plantNameInput?.focus();
+        if (plantForm?.scrollIntoView) {
+          plantForm.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+        persistPlantFormDraft();
       }
 
       async function handleFcmSubmit(event) {
@@ -1842,6 +2256,29 @@
         }
       }
 
+      function persistFcmFormState() {
+        const draft = {
+          token: fcmTokenInput?.value || "",
+          deviceId: fcmDeviceIdInput?.value || "",
+          platform: fcmPlatformInput?.value || "",
+        };
+        saveSessionState(SESSION_KEYS.fcmDraft, draft);
+      }
+
+      function restoreFcmFormState() {
+        const draft = loadSessionState(SESSION_KEYS.fcmDraft);
+        if (!draft) return;
+        if (fcmTokenInput && typeof draft.token === "string") {
+          fcmTokenInput.value = draft.token;
+        }
+        if (fcmDeviceIdInput && typeof draft.deviceId === "string") {
+          fcmDeviceIdInput.value = draft.deviceId;
+        }
+        if (fcmPlatformInput && typeof draft.platform === "string") {
+          fcmPlatformInput.value = draft.platform;
+        }
+      }
+
       function handleSensorFormSubmit(event) {
         event.preventDefault();
         const deviceId = sensorDeviceInput.value.trim();
@@ -1877,6 +2314,38 @@
           sensorType,
         )}.`;
         sensorStatus.className = "text-success small";
+      }
+
+      function persistSensorFormState() {
+        const draft = {
+          deviceId: sensorDeviceInput?.value || "",
+          sensorType: sensorTypeSimulation?.value || "",
+          value: sensorValueInput?.value || "",
+          unit: sensorUnitInput?.value || "",
+        };
+        saveSessionState(SESSION_KEYS.sensorDraft, draft);
+      }
+
+      function restoreSensorFormState() {
+        const draft = loadSessionState(SESSION_KEYS.sensorDraft);
+        if (!draft) return;
+        if (sensorDeviceInput && typeof draft.deviceId === "string") {
+          sensorDeviceInput.value = draft.deviceId;
+        }
+        if (
+          sensorTypeSimulation &&
+          typeof draft.sensorType === "string" &&
+          SENSOR_METADATA[draft.sensorType]
+        ) {
+          sensorTypeSimulation.value = draft.sensorType;
+        }
+        updateSensorSimulationHints();
+        if (sensorValueInput && typeof draft.value === "string") {
+          sensorValueInput.value = draft.value;
+        }
+        if (sensorUnitInput && typeof draft.unit === "string") {
+          sensorUnitInput.value = draft.unit;
+        }
       }
 
       function updateSensorSimulationHints() {
@@ -1924,6 +2393,7 @@
           JSON.stringify({ event: "unsubscribeFromDevice", deviceId }),
         );
         subscribedDevices.delete(deviceId);
+        persistSubscribedDevices();
         document.getElementById(`device-${deviceId}`)?.remove();
         logMessage(`Desuscrito de ${deviceId}`);
       }
@@ -2070,6 +2540,38 @@
               ? `Define el valor máximo permitido para ${sensorName} en ${unitLabel}.`
               : `Define el valor máximo permitido para ${sensorName}.`;
           }
+        }
+      }
+
+      function persistThresholdFormState() {
+        const draft = {
+          deviceId: thresholdDeviceInput?.value || "",
+          sensorType: sensorTypeSelect?.value || "",
+          min: minThresholdInput?.value || "",
+          max: maxThresholdInput?.value || "",
+        };
+        saveSessionState(SESSION_KEYS.thresholdDraft, draft);
+      }
+
+      function restoreThresholdFormState() {
+        const draft = loadSessionState(SESSION_KEYS.thresholdDraft);
+        if (!draft) return;
+        if (thresholdDeviceInput && typeof draft.deviceId === "string") {
+          thresholdDeviceInput.value = draft.deviceId;
+        }
+        if (
+          sensorTypeSelect &&
+          typeof draft.sensorType === "string" &&
+          SENSOR_METADATA[draft.sensorType]
+        ) {
+          sensorTypeSelect.value = draft.sensorType;
+        }
+        updateThresholdHints();
+        if (minThresholdInput && typeof draft.min === "string") {
+          minThresholdInput.value = draft.min;
+        }
+        if (maxThresholdInput && typeof draft.max === "string") {
+          maxThresholdInput.value = draft.max;
         }
       }
 

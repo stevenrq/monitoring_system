@@ -24,9 +24,14 @@ interface SensorThresholdConfig {
   plantName?: string | null;
 }
 
+interface SensorThresholdEntry extends SensorThresholdConfig {
+  key: string;
+  source: "plant" | "manual";
+}
+
 const alertThresholds: Record<
   string,
-  Record<string, SensorThresholdConfig>
+  Record<string, SensorThresholdEntry[]>
 > = {};
 
 export const ALERT_ENABLED_DEVICE_IDS = new Set<string>(["ESP32_1"]);
@@ -51,6 +56,8 @@ export function setAlertThreshold(
 
   const isClearing =
     thresholds.min === undefined && thresholds.max === undefined;
+  const source = association.plantId ? "plant" : "manual";
+  const entryKey = association.plantId ?? "manual";
 
   if (!normalizedDeviceId) {
     throw new Error("El dispositivo es obligatorio para configurar umbrales.");
@@ -75,7 +82,11 @@ export function setAlertThreshold(
   }
 
   if (normalizedSensorType === "solar_radiation") {
-    delete sanitized.min;
+    if (sanitized.min !== undefined && sanitized.min <= 0) {
+      throw new Error(
+        "El umbral mínimo para radiación solar debe ser mayor a 0.",
+      );
+    }
   }
 
   if (
@@ -85,18 +96,6 @@ export function setAlertThreshold(
   ) {
     sanitized.min = 20;
     delete sanitized.max;
-  }
-
-  if (
-    sanitized.min === undefined &&
-    sanitized.max === undefined &&
-    alertThresholds[normalizedDeviceId]?.[normalizedSensorType]
-  ) {
-    delete alertThresholds[normalizedDeviceId][normalizedSensorType];
-    if (Object.keys(alertThresholds[normalizedDeviceId]).length === 0) {
-      delete alertThresholds[normalizedDeviceId];
-    }
-    return undefined;
   }
 
   if (sanitized.min !== undefined && sanitized.max !== undefined) {
@@ -111,11 +110,45 @@ export function setAlertThreshold(
     alertThresholds[normalizedDeviceId] = {};
   }
 
-  alertThresholds[normalizedDeviceId][normalizedSensorType] = {
+  const sensorEntries =
+    alertThresholds[normalizedDeviceId][normalizedSensorType] ?? [];
+
+  const existingIndex = sensorEntries.findIndex(
+    (entry) => entry.key === entryKey && entry.source === source,
+  );
+
+  if (sanitized.min === undefined && sanitized.max === undefined) {
+    if (existingIndex !== -1) {
+      sensorEntries.splice(existingIndex, 1);
+      clearAlertState(normalizedDeviceId, normalizedSensorType, entryKey);
+    }
+    if (sensorEntries.length === 0) {
+      delete alertThresholds[normalizedDeviceId][normalizedSensorType];
+      if (Object.keys(alertThresholds[normalizedDeviceId]).length === 0) {
+        delete alertThresholds[normalizedDeviceId];
+      }
+    } else {
+      alertThresholds[normalizedDeviceId][normalizedSensorType] = sensorEntries;
+    }
+    return undefined;
+  }
+
+  const newEntry: SensorThresholdEntry = {
     thresholds: sanitized,
     plantId: association.plantId ?? null,
     plantName: association.plantName ?? null,
+    key: entryKey,
+    source,
   };
+
+  if (existingIndex !== -1) {
+    sensorEntries[existingIndex] = newEntry;
+  } else {
+    sensorEntries.push(newEntry);
+  }
+
+  alertThresholds[normalizedDeviceId][normalizedSensorType] = sensorEntries;
+  clearAlertState(normalizedDeviceId, normalizedSensorType, entryKey);
   return { ...sanitized };
 }
 
@@ -126,7 +159,58 @@ export function getAlertThreshold(
   deviceId: string,
   sensorType: string,
 ): SensorThresholdConfig | undefined {
-  return alertThresholds[deviceId]?.[sensorType];
+  const entries = alertThresholds[deviceId]?.[sensorType];
+  if (!entries || !entries.length) return undefined;
+  const manualEntry = entries.find((entry) => entry.source === "manual");
+  const selected = manualEntry ?? entries[0];
+  return {
+    thresholds: selected.thresholds,
+    plantId: selected.plantId,
+    plantName: selected.plantName,
+  };
+}
+
+/**
+ * Limpia el cooldown de alertas para un dispositivo o sensor específico.
+ */
+export function clearAlertState(
+  deviceId: string,
+  sensorType?: string,
+  entryKey?: string,
+): void {
+  const normalizedDeviceId = deviceId?.trim();
+  if (!normalizedDeviceId) return;
+
+  if (sensorType) {
+    const normalizedSensorType = sensorType.trim();
+    if (entryKey) {
+      delete lastAlerts[
+        `${normalizedDeviceId}-${normalizedSensorType}-${entryKey}`
+      ];
+      return;
+    }
+    for (const key of Object.keys(lastAlerts)) {
+      if (key.startsWith(`${normalizedDeviceId}-${normalizedSensorType}-`)) {
+        delete lastAlerts[key];
+      }
+    }
+    return;
+  }
+
+  for (const key of Object.keys(lastAlerts)) {
+    if (key.startsWith(`${normalizedDeviceId}-`)) {
+      delete lastAlerts[key];
+    }
+  }
+}
+
+export function resetDeviceAlertThresholds(deviceId: string): void {
+  const normalizedDeviceId = deviceId?.trim();
+  if (!normalizedDeviceId) return;
+  clearAlertState(normalizedDeviceId);
+  if (alertThresholds[normalizedDeviceId]) {
+    delete alertThresholds[normalizedDeviceId];
+  }
 }
 
 /**
@@ -144,115 +228,127 @@ export const checkSensorDataForAlerts = async (
     return;
   }
 
-  const thresholdConfig = getAlertThreshold(deviceId, sensorType);
-  const thresholds = thresholdConfig?.thresholds;
-  if (!thresholds) return;
+  const entries = getAlertThresholdEntries(deviceId, sensorType);
+  if (!entries.length) return;
 
-  let alertMessage: string | null = null;
-  let triggeredThresholdType: ThresholdType | null = null;
-  let triggeredThresholdValue: number | undefined;
+  const manualEntry = entries.find((entry) => entry.source === "manual");
+  const applicableEntries = manualEntry
+    ? [manualEntry]
+    : entries.filter((entry) => entry.source === "plant");
 
-  if (thresholds.max !== undefined && value > thresholds.max) {
-    alertMessage = `¡Alerta en ${deviceId}! ${getSensorName(sensorType)} ha superado el máximo: ${value.toFixed(
-      2,
-    )} ${unit} (Máx: ${thresholds.max} ${unit}).`;
-    triggeredThresholdType = "max";
-    triggeredThresholdValue = thresholds.max;
-  } else if (thresholds.min !== undefined && value < thresholds.min) {
-    alertMessage = `¡Alerta en ${deviceId}! ${getSensorName(sensorType)} está por debajo del mínimo: ${value.toFixed(
-      2,
-    )} ${unit} (Mín: ${thresholds.min} ${unit}).`;
-    triggeredThresholdType = "min";
-    triggeredThresholdValue = thresholds.min;
-  }
-
-  if (
-    !alertMessage ||
-    !triggeredThresholdType ||
-    triggeredThresholdValue === undefined
-  ) {
+  if (!applicableEntries.length) {
     return;
   }
 
-  const alertKey = `${deviceId}-${sensorType}`;
-  const now = Date.now();
-  const lastAlertTimestamp = lastAlerts[alertKey];
+  for (const entry of applicableEntries) {
+    const thresholds = entry.thresholds;
+    const plantId = entry.plantId !== undefined ? entry.plantId : null;
+    const plantName = entry.plantName !== undefined ? entry.plantName : null;
+    const plantLabel = plantName || plantId || deviceId;
+    const sensorLabel = getSensorName(sensorType);
+    const unitSuffix = unit ? ` ${unit}` : "";
+    let alertMessage: string | null = null;
+    let triggeredThresholdType: ThresholdType | null = null;
+    let triggeredThresholdValue: number | undefined;
 
-  // Si la última alerta fue hace menos de el cooldown, no enviar otra
-  if (lastAlertTimestamp && now - lastAlertTimestamp < ALERT_COOLDOWN_MS) {
-    return;
-  }
-
-  // Registrar la alerta
-  lastAlerts[alertKey] = now;
-
-  console.log(`ALERTA: ${alertMessage}`);
-
-  const timestamp = new Date().toISOString();
-
-  const plantId =
-    thresholdConfig?.plantId !== undefined ? thresholdConfig.plantId : null;
-  const plantName =
-    thresholdConfig?.plantName !== undefined ? thresholdConfig.plantName : null;
-  const sensorThresholds = { ...thresholds };
-
-  const alertPayload = {
-    event: "sensorAlert",
-    deviceId,
-    sensorType,
-    value,
-    unit,
-    message: alertMessage,
-    timestamp,
-    thresholdType: triggeredThresholdType,
-    thresholdValue: triggeredThresholdValue,
-    thresholds: sensorThresholds,
-    plantId,
-    plantName,
-  };
-
-  // Enviar a todos los clientes conectados
-  const payloadStr = JSON.stringify(alertPayload);
-  for (const client of wss.clients) {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(payloadStr);
+    if (thresholds.max !== undefined && value > thresholds.max) {
+      alertMessage = `${plantLabel}: ${sensorLabel} superó el máximo (${value.toFixed(
+        1,
+      )}${unitSuffix} > ${thresholds.max}${unitSuffix}).`;
+      triggeredThresholdType = "max";
+      triggeredThresholdValue = thresholds.max;
+    } else if (thresholds.min !== undefined && value < thresholds.min) {
+      alertMessage = `${plantLabel}: ${sensorLabel} cayó bajo el mínimo (${value.toFixed(
+        1,
+      )}${unitSuffix} < ${thresholds.min}${unitSuffix}).`;
+      triggeredThresholdType = "min";
+      triggeredThresholdValue = thresholds.min;
     }
+
+    if (
+      !alertMessage ||
+      !triggeredThresholdType ||
+      triggeredThresholdValue === undefined
+    ) {
+      continue;
+    }
+
+    const alertKey = `${deviceId}-${sensorType}-${entry.key}`;
+    const now = Date.now();
+    const lastAlertTimestamp = lastAlerts[alertKey];
+
+    // Si la última alerta fue hace menos de el cooldown, no enviar otra
+    if (lastAlertTimestamp && now - lastAlertTimestamp < ALERT_COOLDOWN_MS) {
+      continue;
+    }
+
+    // Registrar la alerta
+    lastAlerts[alertKey] = now;
+
+    console.log(`ALERTA: ${alertMessage}`);
+
+    const timestamp = new Date().toISOString();
+
+    const sensorThresholds = { ...thresholds };
+
+    const alertPayload = {
+      event: "sensorAlert",
+      deviceId,
+      sensorType,
+      value,
+      unit,
+      message: alertMessage,
+      timestamp,
+      thresholdType: triggeredThresholdType,
+      thresholdValue: triggeredThresholdValue,
+      thresholds: sensorThresholds,
+      plantId,
+      plantName,
+    };
+
+    // Enviar a todos los clientes conectados
+    const payloadStr = JSON.stringify(alertPayload);
+    for (const client of wss.clients) {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(payloadStr);
+      }
+    }
+
+    let tokens: string[] = [];
+    try {
+      tokens = await getActiveFcmTokens({ deviceId });
+    } catch (error) {
+      console.error(
+        "No se pudieron cargar los tokens FCM antes de enviar la alerta:",
+        error,
+      );
+    }
+
+    const notificationPayload: SensorAlertNotification = {
+      deviceId,
+      sensorType,
+      value,
+      unit,
+      thresholdType: triggeredThresholdType,
+      thresholdValue: triggeredThresholdValue,
+      message: alertMessage,
+      timestamp,
+      sensorThresholds,
+      plantId: plantId ?? undefined,
+      plantName: plantName ?? undefined,
+    };
+
+    if (tokens.length) {
+      notificationPayload.tokens = tokens;
+    }
+
+    void sendSensorAlertNotification(notificationPayload).catch((error) => {
+      console.error(
+        "No se pudo enviar la alerta vía Firebase Cloud Messaging:",
+        error,
+      );
+    });
   }
-
-  let tokens: string[] = [];
-  try {
-    tokens = await getActiveFcmTokens({ deviceId });
-  } catch (error) {
-    console.error(
-      "No se pudieron cargar los tokens FCM antes de enviar la alerta:",
-      error,
-    );
-  }
-
-  const notificationPayload: SensorAlertNotification = {
-    deviceId,
-    sensorType,
-    value,
-    unit,
-    thresholdType: triggeredThresholdType,
-    thresholdValue: triggeredThresholdValue,
-    message: alertMessage,
-    timestamp,
-    sensorThresholds,
-    plantId: plantId ?? undefined,
-    plantName: plantName ?? undefined,
-  };
-
-  if (tokens.length) {
-    notificationPayload.tokens = tokens;
-  }
-
-  void sendSensorAlertNotification(notificationPayload).catch((error) => {
-    console.error(
-      "No se pudo enviar la alerta vía Firebase Cloud Messaging:",
-      error,
-    );
-  });
 };
 
 /**
@@ -268,4 +364,11 @@ function getSensorName(sensorType: string): string {
     solar_radiation: "La Radiación Solar",
   };
   return names[sensorType] || sensorType;
+}
+
+function getAlertThresholdEntries(
+  deviceId: string,
+  sensorType: string,
+): SensorThresholdEntry[] {
+  return alertThresholds[deviceId]?.[sensorType] ?? [];
 }

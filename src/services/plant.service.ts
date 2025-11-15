@@ -8,6 +8,7 @@ import { SENSOR_TYPES, SensorType } from "../constants/sensor-types";
 import Plant from "../models/plant.model";
 import {
   ALERT_ENABLED_DEVICE_IDS,
+  resetDeviceAlertThresholds,
   setAlertThreshold,
 } from "./notification.service";
 
@@ -47,7 +48,7 @@ export const createPlant = async (
 
   const newPlant = new Plant(payload);
   const saved = await newPlant.save();
-  await applyPlantThresholds(saved);
+  await refreshDeviceAlertThresholds(saved.deviceId);
   return saved;
 };
 
@@ -69,6 +70,7 @@ export const updatePlant = async (
   if (!plant) {
     return null;
   }
+  const previousDeviceId = (plant.deviceId || DEFAULT_DEVICE_ID).trim();
 
   if (updateData.name !== undefined) {
     const normalizedName = updateData.name.trim();
@@ -88,7 +90,12 @@ export const updatePlant = async (
     plant.name = normalizedName;
   }
 
-  plant.deviceId = DEFAULT_DEVICE_ID;
+  if (updateData.deviceId !== undefined) {
+    const normalizedDeviceId = updateData.deviceId.trim();
+    plant.deviceId = normalizedDeviceId || DEFAULT_DEVICE_ID;
+  } else {
+    plant.deviceId = (plant.deviceId || DEFAULT_DEVICE_ID).trim();
+  }
 
   if (updateData.thresholds) {
     for (const sensor of SENSOR_TYPES) {
@@ -106,7 +113,11 @@ export const updatePlant = async (
 
   const saved = await plant.save();
 
-  await applyPlantThresholds(saved);
+  await refreshDeviceAlertThresholds(saved.deviceId);
+
+  if (previousDeviceId !== saved.deviceId) {
+    await refreshDeviceAlertThresholds(previousDeviceId);
+  }
   return saved;
 };
 
@@ -115,15 +126,7 @@ export const deletePlant = async (
 ): Promise<IPlantDocument | null> => {
   const plant = await Plant.findByIdAndDelete(plantId);
   if (plant) {
-    const latest = await Plant.find()
-      .sort({ updatedAt: -1, createdAt: -1 })
-      .limit(1);
-
-    if (latest.length) {
-      await applyPlantThresholds(latest[0]);
-    } else {
-      clearDeviceThresholds(DEFAULT_DEVICE_ID);
-    }
+    await refreshDeviceAlertThresholds(plant.deviceId);
   }
   return plant;
 };
@@ -150,11 +153,48 @@ export const initializePlantThresholds = async (): Promise<void> => {
     }
   }
 
-  const plants = await Plant.find().sort({ updatedAt: 1, createdAt: 1 });
+  const deviceIds = await Plant.distinct("deviceId");
+  const normalizedIds = new Set<string>();
+
+  for (const deviceId of deviceIds as Array<string | undefined | null>) {
+    const normalized =
+      (typeof deviceId === "string" && deviceId.trim()) || DEFAULT_DEVICE_ID;
+    normalizedIds.add(normalized);
+  }
+
+  if (!normalizedIds.size) {
+    await refreshDeviceAlertThresholds(DEFAULT_DEVICE_ID);
+    return;
+  }
+
+  for (const deviceId of normalizedIds) {
+    await refreshDeviceAlertThresholds(deviceId);
+  }
+};
+
+export async function refreshDeviceAlertThresholds(
+  deviceId?: string
+): Promise<void> {
+  const normalizedDeviceId = (deviceId || DEFAULT_DEVICE_ID).trim();
+
+  if (!ALERT_ENABLED_DEVICE_IDS.has(normalizedDeviceId)) {
+    return;
+  }
+
+  const plants = await Plant.find({ deviceId: normalizedDeviceId })
+    .sort({ updatedAt: 1, createdAt: 1 })
+    .exec();
+
+  clearDeviceThresholds(normalizedDeviceId);
+
+  if (!plants.length) {
+    return;
+  }
+
   for (const plant of plants) {
     await applyPlantThresholds(plant);
   }
-};
+}
 
 async function applyPlantThresholds(plant: IPlant | IPlantDocument) {
   const deviceId = (plant.deviceId || DEFAULT_DEVICE_ID).trim();
@@ -182,13 +222,8 @@ function clearDeviceThresholds(deviceId: string) {
   if (!ALERT_ENABLED_DEVICE_IDS.has(normalizedDeviceId)) {
     return;
   }
-  for (const sensor of SENSOR_TYPES) {
-    try {
-      setAlertThreshold(normalizedDeviceId, sensor, {});
-    } catch {
-      // ignore errors during cleanup
-    }
-  }
+
+  resetDeviceAlertThresholds(normalizedDeviceId);
 }
 
 function normalizeThresholds(thresholds?: PlantThresholds): PlantThresholds {

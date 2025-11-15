@@ -1,6 +1,7 @@
 import { WebSocket, WebSocketServer } from "ws";
 import {
   checkSensorDataForAlerts,
+  clearAlertState,
   setAlertThreshold,
 } from "../../src/services/notification.service";
 import { sendSensorAlertNotification } from "../../src/services/push-notification.service";
@@ -90,7 +91,7 @@ describe("notification.service", () => {
     expect(payload.sensorType).toBe("temperature");
     expect(payload.value).toBe(26.2);
     expect(payload.unit).toBe("°C");
-    expect(payload.message).toContain("ha superado el máximo");
+    expect(payload.message).toContain("superó el máximo");
     expect(payload.timestamp).toBe("2024-01-01T00:00:00.000Z");
     expect(payload.thresholdType).toBe("max");
     expect(payload.thresholdValue).toBe(25);
@@ -107,7 +108,7 @@ describe("notification.service", () => {
         unit: "°C",
         thresholdType: "max",
         thresholdValue: 25,
-        message: expect.stringContaining("Máx"),
+        message: expect.stringContaining("superó el máximo"),
         timestamp: "2024-01-01T00:00:00.000Z",
         tokens: ["token-a", "token-b"],
         plantId: "plant-1",
@@ -143,5 +144,89 @@ describe("notification.service", () => {
     await checkSensorDataForAlerts(wss, payload);
     expect(openClient.send).toHaveBeenCalledTimes(2);
     expect(sendSensorAlertNotificationMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("permite enviar alertas inmediatamente después de limpiar el estado", async () => {
+    const { wss, openClient } = createMockServer();
+    setAlertThreshold("ESP32_1", "humidity", { min: 20 });
+
+    const payload = {
+      deviceId: "ESP32_1",
+      sensorType: "humidity",
+      value: 10,
+      unit: "%",
+    };
+
+    await checkSensorDataForAlerts(wss, payload);
+    expect(openClient.send).toHaveBeenCalledTimes(1);
+
+    await checkSensorDataForAlerts(wss, payload);
+    expect(openClient.send).toHaveBeenCalledTimes(1);
+
+    clearAlertState("ESP32_1");
+    await checkSensorDataForAlerts(wss, payload);
+    expect(openClient.send).toHaveBeenCalledTimes(2);
+  });
+
+  it("envía múltiples alertas cuando existen varias plantas asociadas al mismo sensor", async () => {
+    const { wss, openClient } = createMockServer();
+    setAlertThreshold(
+      "ESP32_1",
+      "temperature",
+      { max: 26 },
+      { plantId: "plant-1", plantName: "Lavanda" }
+    );
+    setAlertThreshold(
+      "ESP32_1",
+      "temperature",
+      { max: 22 },
+      { plantId: "plant-2", plantName: "Rosa" }
+    );
+
+    await checkSensorDataForAlerts(wss, {
+      deviceId: "ESP32_1",
+      sensorType: "temperature",
+      value: 27,
+      unit: "°C",
+    });
+
+    expect(openClient.send).toHaveBeenCalledTimes(2);
+    const payloadA = JSON.parse(openClient.send.mock.calls[0][0]);
+    const payloadB = JSON.parse(openClient.send.mock.calls[1][0]);
+
+    expect(new Set([payloadA.plantName, payloadB.plantName])).toEqual(
+      new Set(["Lavanda", "Rosa"]),
+    );
+  });
+
+  it("envía alerta cuando el mínimo de radiación solar es mayor a cero", async () => {
+    const { wss, openClient } = createMockServer();
+    setAlertThreshold(
+      "ESP32_1",
+      "solar_radiation",
+      { min: 50 },
+      { plantId: "plant-1", plantName: "Lavanda" },
+    );
+
+    await checkSensorDataForAlerts(wss, {
+      deviceId: "ESP32_1",
+      sensorType: "solar_radiation",
+      value: 30,
+      unit: "W/m²",
+    });
+
+    expect(openClient.send).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(openClient.send.mock.calls[0][0]);
+    expect(payload.plantName).toBe("Lavanda");
+    expect(payload.thresholdType).toBe("min");
+  });
+
+  it("rechaza mínimos de radiación solar iguales o menores a cero", () => {
+    expect(() =>
+      setAlertThreshold("ESP32_1", "solar_radiation", { min: 0 }),
+    ).toThrow("mayor a 0");
+    expect(() =>
+      setAlertThreshold("ESP32_1", "solar_radiation", { min: -10 }),
+    ).toThrow("mayor a 0");
   });
 });

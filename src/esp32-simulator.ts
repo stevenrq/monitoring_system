@@ -38,7 +38,7 @@ const deviceConfig = {
 
       {
         sensorType: "solar_radiation",
-        value: +(Math.random() * 1200).toFixed(2), // W/m2 típico de 0 a 1200
+        value: +(Math.random() * 1200).toFixed(2), // W/m2 típico de 0 a 1200 (W/m2 > 0 && <= 1200)
         unit: "W/m2",
       },
       {
